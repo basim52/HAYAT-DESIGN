@@ -1,6 +1,6 @@
-import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone } from 'lucide-react';
+import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, ChangeEvent } from 'react';
 import { BANK_DETAILS, PAYMENT_METHODS } from '../constants';
 import { CartItem, UserProfile } from '../types';
 import { db } from '../lib/firebase';
@@ -35,8 +35,20 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderUrls, setOrderUrls] = useState<{ whatsappUrl: string; mailtoUrl: string } | null>(null);
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0]);
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
 
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleCopyValue = (value: string) => {
     navigator.clipboard.writeText(value);
@@ -44,7 +56,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleOrderSubmission = async (e: FormEvent) => {
+  const handleOrderSubmission = async (e: FormEvent, preference: 'whatsapp' | 'email') => {
     e.preventDefault();
     setIsSubmitting(true);
     
@@ -53,9 +65,18 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
       const orderData = {
         userId: userProfile?.id || 'guest',
         ...formData,
-        items: cartItems,
+        items: cartItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          category: item.category,
+          image: item.image
+        })),
         total,
         status: 'pending',
+        paymentMethod: selectedMethod.bankName,
+        hasReceipt: !!receiptImage,
         createdAt: new Date().toISOString()
       };
       
@@ -71,20 +92,24 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
         `رقم الجوال: ${formData.phone}\n` +
         `العنوان: ${formData.address}\n\n` +
         `*تفاصيل الطلب:*\n${itemsList}\n\n` +
-        `*الإجمالي: ${total} ر.س*\n\n` +
-        `سأقوم بإرسال صورة إيصال التحويل البنكي الآن.`;
+        `*طريقة الدفع:* ${selectedMethod.bankName}\n` +
+        `*الإجمالي:* ${total} ر.س\n\n` +
+        `${receiptImage ? '*تم إرفاق إيصال التحويل بداخل النظام*' : '*سأقوم بإرسال إيصال التحويل الآن*'}`;
 
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
       
-      const subject = `طلب جديد من حياة ديزاين - ${formData.customerName}`;
+      const subject = `طلب جديد لباسم حياة ديزاين - ${formData.customerName}`;
       const emailBody = message.replace(/\*/g, ''); 
       const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
 
       setOrderUrls({ whatsappUrl, mailtoUrl });
       
-      // Open WhatsApp by default
-      window.open(whatsappUrl, '_blank');
+      if (preference === 'whatsapp') {
+        window.open(whatsappUrl, '_blank');
+      } else {
+        window.location.href = mailtoUrl;
+      }
       
       setShowSuccess(true);
     } catch (err) {
@@ -242,21 +267,22 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                   </div>
 
                   {/* Customer Form */}
-                  <form onSubmit={handleOrderSubmission} className="space-y-5">
+                  <div className="space-y-5">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-bold">بيانات التوصيل</h3>
+                      <h3 className="font-bold text-sm">بيانات التوصيل والطلب</h3>
                       {!userProfile && (
                         <button 
                           type="button" 
                           onClick={onClose}
                           className="text-[10px] font-bold text-brand-purple hover:underline"
                         >
-                          تسجيل دخول لحفظ بياناتك؟
+                          تعديل البيانات؟
                         </button>
                       )}
                     </div>
                     
                     <div className="space-y-4">
+                      {/* Name */}
                       <div className="space-y-1.5">
                         <div className="flex justify-between items-center px-1">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">الاسم الكامل</label>
@@ -272,6 +298,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                         />
                       </div>
 
+                      {/* Phone */}
                       <div className="space-y-1.5">
                         <div className="flex justify-between items-center px-1">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">رقم الجوال</label>
@@ -288,6 +315,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                         />
                       </div>
 
+                      {/* Address */}
                       <div className="space-y-1.5">
                         <div className="flex justify-between items-center px-1">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">عنوان التوصيل / الاستلام</label>
@@ -296,33 +324,78 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                         <textarea
                           required
                           placeholder="المدينة، الحي، اسم الشارع، تفاصيل أخرى"
-                          rows={3}
+                          rows={2}
                           className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all resize-none text-sm"
                           value={formData.address}
                           onChange={e => setFormData({ ...formData, address: e.target.value })}
                         />
                       </div>
+
+                      {/* Receipt Upload */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60 px-1">إيصال التحويل (اختياري)</label>
+                        <div className="relative">
+                          <input 
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            id="checkout-receipt-upload"
+                          />
+                          <label 
+                            htmlFor="checkout-receipt-upload"
+                            className="flex items-center justify-between px-5 py-4 bg-muted-bg/30 border border-dashed border-border-subtle rounded-3xl cursor-pointer hover:bg-gold-light/20 transition-all"
+                          >
+                            <span className="text-xs font-bold text-gray-500 truncate">
+                              {receiptImage ? 'تم اختيار صورة الإيصال' : 'اضغط لرفع صورة الإيصال'}
+                            </span>
+                            <ImageIcon className="w-4 h-4 text-gray-400" />
+                          </label>
+                          {receiptImage && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <img src={receiptImage} className="w-12 h-12 object-cover rounded-xl border border-border-subtle" alt="Preview" />
+                              <button 
+                                type="button"
+                                onClick={() => setReceiptImage(null)}
+                                className="text-[9px] font-bold text-red-500 hover:underline"
+                              >
+                                إزالة الصورة
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full py-5 bg-green-600 text-white rounded-[24px] font-bold text-lg hover:bg-green-700 transition-all duration-300 shadow-xl shadow-green-600/10 flex items-center justify-center gap-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isSubmitting ? (
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                          className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full"
-                        />
-                      ) : (
-                        <>
-                          <Send className="w-5 h-5 -rotate-45" />
-                          <span>إرسال الطلب وإيصال التحويل</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <button
+                        type="button"
+                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address}
+                        onClick={(e) => handleOrderSubmission(e, 'whatsapp')}
+                        className="py-4 bg-green-600 text-white rounded-2xl font-bold text-xs hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'جاري...' : (
+                          <>
+                            <MessageCircle className="w-4 h-4" />
+                            إرسال عبر واتساب
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address}
+                        onClick={(e) => handleOrderSubmission(e, 'email')}
+                        className="py-4 bg-brand-purple text-white rounded-2xl font-bold text-xs hover:bg-brand-purple/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'جاري...' : (
+                          <>
+                            <Mail className="w-4 h-4" />
+                            إرسال عبر الايميل
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </>
             )}
