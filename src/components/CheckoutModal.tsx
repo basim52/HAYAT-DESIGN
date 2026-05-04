@@ -101,9 +101,9 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
       
-      const subject = `طلب جديد لباسم حياة ديزاين - ${formData.customerName}`;
-      const emailBody = message.replace(/\*/g, ''); 
-      const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody.substring(0, 1500))}`;
+      const subject = `طلب جديد - ${formData.customerName}`;
+      const emailBody = `الاسم: ${formData.customerName}\nالجوال: ${formData.phone}\nالعنوان: ${formData.address}\n\nتفاصيل الطلب:\n${cartItems.map(i => `${i.name} x${i.quantity}`).join('\n')}\n\nالإجمالي: ${total} ر.س`;
+      const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
 
       setOrderUrls({ whatsappUrl, mailtoUrl });
       setPreferredMethod(preference);
@@ -161,14 +161,26 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                           إرسال عبر واتساب
                         </a>
                       ) : (
-                        <a 
-                          href={orderUrls.mailtoUrl}
-                          target="_top"
-                          className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors shadow-lg shadow-brand-purple/20"
-                        >
-                          <Mail className="w-5 h-5" />
-                          إرسال عبر البريد الإلكتروني
-                        </a>
+                        <div className="space-y-3">
+                          <a 
+                            href={orderUrls.mailtoUrl}
+                            className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors shadow-lg shadow-brand-purple/20 w-full"
+                          >
+                            <Mail className="w-5 h-5" />
+                            فتح تطبيق البريد
+                          </a>
+                          <button 
+                            onClick={() => {
+                              const body = decodeURIComponent(orderUrls.mailtoUrl.split('body=')[1] || '');
+                              handleCopyValue(body);
+                              alert('تم نسخ تفاصيل الطلب! يمكنك الآن لصقها في إيميل يدوي إذا لم يفتح التطبيق تلقائياً');
+                            }}
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-muted-bg text-charcoal rounded-2xl font-bold text-xs hover:bg-gold-light/20 transition-colors w-full border border-border-subtle"
+                          >
+                            <Copy className="w-4 h-4 text-gold" />
+                            نسخ تفاصيل الطلب (حل بديل)
+                          </button>
+                        </div>
                       )}
                     </>
                   )}
