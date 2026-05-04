@@ -1,9 +1,9 @@
-import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import React, { useState } from 'react';
-import { Product, Category } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Product, Category, Order } from '../types';
 import { db } from '../lib/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
 
 interface AdminPanelProps {
@@ -22,7 +22,7 @@ export default function AdminPanel({
   heroImage,
 }: AdminPanelProps) {
   const { isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders'>('products');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -41,6 +41,21 @@ export default function AdminPanel({
     image: '',
     slug: '',
   });
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  // Fetch orders when admin panel opens and tab is orders
+  useEffect(() => {
+    if (isOpen && isAdmin) {
+      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+      const unsub = onSnapshot(q, (snapshot) => {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        setOrders(docs);
+      });
+      return unsub;
+    }
+  }, [isOpen, isAdmin]);
 
   if (!isAdmin && isOpen) {
     return (
@@ -143,7 +158,36 @@ export default function AdminPanel({
     } catch (err) {
       console.error(err);
     }
-  }
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { status });
+    } catch (err) {
+      console.error(err);
+      alert('خطأ أثناء تحديث حالة الطلب');
+    }
+  };
+
+  const getStatusColor = (status: Order['status']) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-600 border-yellow-200';
+      case 'processing': return 'bg-blue-100 text-blue-600 border-blue-200';
+      case 'completed': return 'bg-green-100 text-green-600 border-green-200';
+      case 'cancelled': return 'bg-red-100 text-red-600 border-red-200';
+      default: return 'bg-gray-100 text-gray-600 border-gray-200';
+    }
+  };
+
+  const getStatusLabel = (status: Order['status']) => {
+    switch (status) {
+      case 'pending': return 'قيد الانتظار';
+      case 'processing': return 'جاري التنفيذ';
+      case 'completed': return 'تم التسليم';
+      case 'cancelled': return 'ملغى';
+      default: return status;
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -188,6 +232,17 @@ export default function AdminPanel({
                     className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'hero' ? 'bg-brand-purple text-white' : 'text-gray-400 hover:text-charcoal'}`}
                   >
                     الغلاف
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('orders')}
+                    className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'orders' ? 'bg-brand-purple text-white' : 'text-gray-400 hover:text-charcoal'}`}
+                  >
+                    الطلبات
+                    {orders.filter(o => o.status === 'pending').length > 0 && (
+                      <span className="mr-2 bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full ring-2 ring-white">
+                        {orders.filter(o => o.status === 'pending').length}
+                      </span>
+                    )}
                   </button>
                 </div>
                 <button onClick={onClose} className="p-3 bg-white hover:bg-red-50 hover:text-red-500 rounded-full border border-border-subtle transition-all">
@@ -471,11 +526,188 @@ export default function AdminPanel({
                     </div>
                   </div>
                 )}
+
+                {activeTab === 'orders' && (
+                  <div className="space-y-8">
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <h3 className="text-xl font-bold">إدارة الطلبات</h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">متابعة المبيعات والعملاء</p>
+                      </div>
+                      <div className="flex flex-wrap gap-4">
+                        <div className="bg-white px-4 py-2 rounded-xl border border-border-subtle flex flex-col items-center">
+                          <span className="text-[9px] text-gray-400 font-bold uppercase">إجمالي الطلبات</span>
+                          <span className="text-sm font-extrabold">{orders.length}</span>
+                        </div>
+                        <div className="bg-white px-4 py-2 rounded-xl border border-border-subtle flex flex-col items-center text-brand-teal">
+                          <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">المبيعات</span>
+                          <span className="text-sm font-extrabold">{orders.reduce((sum, o) => sum + o.total, 0)} ر.س</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {orders.length === 0 ? (
+                        <div className="bg-white p-20 rounded-[40px] text-center border border-border-subtle">
+                          <Package className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                          <p className="text-gray-400 font-bold">لا يوجد طلبات حالياً</p>
+                        </div>
+                      ) : (
+                        orders.map((order) => (
+                          <motion.div 
+                            key={order.id}
+                            layout
+                            className={`bg-white rounded-[32px] border transition-all overflow-hidden ${expandedOrderId === order.id ? 'border-brand-purple shadow-xl' : 'border-border-subtle hover:border-brand-purple/30'}`}
+                          >
+                            {/* Summary View */}
+                            <div 
+                              onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
+                              className="p-6 cursor-pointer flex flex-wrap items-center gap-6"
+                            >
+                              <div className="w-12 h-12 bg-muted-bg rounded-2xl flex items-center justify-center text-brand-purple">
+                                <Package className="w-6 h-6" />
+                              </div>
+                              <div className="flex-1 min-w-[200px]">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-bold text-sm">{order.customerName}</h4>
+                                  <span className={`text-[9px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-widest ${getStatusColor(order.status)}`}>
+                                    {getStatusLabel(order.status)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-4 text-[10px] text-gray-400 font-bold">
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{new Date(order.createdAt).toLocaleDateString('ar-SA')}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="w-1 h-1 bg-gray-200 rounded-full" />
+                                    <span>{order.items.length} منتجات</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-left">
+                                <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-widest">المبلغ الإجمالي</span>
+                                <span className="text-lg font-extrabold text-charcoal">{order.total} <span className="text-[10px] font-medium text-gray-300">ر.س</span></span>
+                              </div>
+                              <div className="p-2 bg-muted-bg rounded-lg text-gray-300">
+                                {expandedOrderId === order.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                              </div>
+                            </div>
+
+                            {/* Detailed View */}
+                            <AnimatePresence>
+                              {expandedOrderId === order.id && (
+                                <motion.div 
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="border-t border-border-subtle bg-muted-bg/30"
+                                >
+                                  <div className="p-8 grid md:grid-cols-2 gap-8">
+                                    {/* Left: Customer & Management */}
+                                    <div className="space-y-6">
+                                      <div className="space-y-3">
+                                        <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                          <User className="w-3 h-3" />
+                                          بيانات العميل
+                                        </h5>
+                                        <div className="bg-white p-5 rounded-2xl border border-border-subtle space-y-3">
+                                          <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-400">الاسم:</span>
+                                            <span className="font-bold">{order.customerName}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center text-xs font-mono">
+                                            <span className="text-gray-400 font-sans">الجوال:</span>
+                                            <a href={`tel:${order.phone}`} className="font-bold flex items-center gap-1 text-brand-purple hover:underline">
+                                              {order.phone}
+                                              <ExternalLink className="w-3 h-3" />
+                                            </a>
+                                          </div>
+                                          <div className="flex flex-col gap-1 text-xs">
+                                            <span className="text-gray-400">العنوان:</span>
+                                            <span className="font-bold leading-relaxed">{order.address}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-3">
+                                        <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                          <AlertCircle className="w-3 h-3" />
+                                          إدارة حالة الطلب
+                                        </h5>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {(['pending', 'processing', 'completed', 'cancelled'] as Order['status'][]).map((s) => (
+                                            <button 
+                                              key={s}
+                                              onClick={() => handleUpdateOrderStatus(order.id, s)}
+                                              className={`py-3 px-4 rounded-xl text-[10px] font-bold transition-all border ${order.status === s ? getStatusColor(s) + ' ring-2 ring-offset-2 ring-offset-muted-bg' : 'bg-white border-border-subtle text-gray-400 hover:border-gray-300'}`}
+                                            >
+                                              {getStatusLabel(s)}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+
+                                      <div className="bg-brand-purple/5 p-4 rounded-2xl border border-brand-purple/10 flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-brand-purple text-white rounded-xl flex items-center justify-center">
+                                          <MessageCircle className="w-5 h-5" />
+                                        </div>
+                                        <div className="flex-1">
+                                          <p className="text-[10px] font-bold text-gray-500 mb-0.5">تواصل سريع</p>
+                                          <a 
+                                            href={`https://wa.me/${order.phone.replace(/[^0-9]/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noreferrer"
+                                            className="text-xs font-bold text-brand-purple hover:underline"
+                                          >
+                                            مراسلة العميل عبر واتساب
+                                          </a>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Right: Items */}
+                                    <div className="space-y-3">
+                                      <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                        <Package className="w-3 h-3" />
+                                        محتويات الطلب
+                                      </h5>
+                                      <div className="bg-white rounded-2xl border border-border-subtle divide-y divide-border-subtle overflow-hidden">
+                                        {order.items.map((item, i) => (
+                                          <div key={i} className="p-4 flex gap-4 items-center">
+                                            <img src={item.image} className="w-12 h-12 rounded-lg object-cover bg-gold-light" />
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-xs font-bold truncate">{item.name}</p>
+                                              <p className="text-[10px] text-gray-400 font-bold uppercase">{item.category}</p>
+                                            </div>
+                                            <div className="text-left">
+                                              <p className="text-xs font-extrabold">{item.price} ر.س</p>
+                                              <p className="text-[10px] text-gray-400 font-bold">الكمية: {item.quantity}</p>
+                                            </div>
+                                          </div>
+                                        ))}
+                                        <div className="p-4 bg-muted-bg/50 flex justify-between items-center text-sm">
+                                          <span className="font-bold">المجموع:</span>
+                                          <span className="font-extrabold text-brand-purple">{order.total} ر.س</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
         </>
       )}
     </AnimatePresence>
+
   );
 }
