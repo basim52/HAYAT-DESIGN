@@ -13,22 +13,37 @@ interface LoginModalProps {
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { user, profile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: profile?.fullName || '',
-    phone: profile?.phone || '',
-    address: profile?.address || '',
+    fullName: '',
+    phone: '',
+    address: '',
   });
+
+  // Sync state when profile loads or editing starts
+  React.useEffect(() => {
+    if (profile && !isEditing) {
+      setFormData({
+        fullName: profile.fullName || '',
+        phone: profile.phone || '',
+        address: profile.address || '',
+      });
+    }
+  }, [profile, isEditing]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     
+    setIsSubmitting(true);
     try {
       await updateDoc(doc(db, 'users', user.uid), formData);
       setIsEditing(false);
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("حدث خطأ أثناء تحديث البيانات");
+      alert("حدث خطأ في النظام. يرجى التأكد من اتصالك بالإنترنت والمحاولة مجدداً.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -155,9 +170,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     <div className="flex gap-3 pt-2">
                       <button 
                         type="submit"
-                        className="flex-1 py-4 bg-brand-teal text-white rounded-2xl font-bold text-sm"
+                        disabled={isSubmitting}
+                        className="flex-1 py-4 bg-brand-teal text-white rounded-2xl font-bold text-sm disabled:opacity-50"
                       >
-                        حفظ التعديلات
+                        {isSubmitting ? 'جاري الحفظ...' : 'حفظ التعديلات'}
                       </button>
                       <button 
                         type="button"

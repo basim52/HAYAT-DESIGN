@@ -34,8 +34,12 @@ service cloud.firestore {
         request.resource.data.keys().hasAll(['fullName', 'email']) &&
         request.resource.data.email == request.auth.token.email &&
         (!request.resource.data.keys().contains('isAdmin') || request.resource.data.isAdmin == false);
+      
+      // Allow owners to update basic info only
       allow update: if isOwner(userId) && 
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'email']));
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'phone', 'address']);
+      
+      // Admins can update anything
       allow update: if isAdmin();
     }
 
