@@ -338,23 +338,27 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
 
                       {/* Receipt Upload */}
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60 px-1">إيصال التحويل (اختياري)</label>
+                        <div className="flex justify-between items-center px-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">إيصال التحويل</label>
+                          <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                        </div>
                         <div className="relative">
                           <input 
                             type="file"
                             accept="image/*"
+                            required
                             onChange={handleImageUpload}
                             className="hidden"
                             id="checkout-receipt-upload"
                           />
                           <label 
                             htmlFor="checkout-receipt-upload"
-                            className="flex items-center justify-between px-5 py-4 bg-muted-bg/30 border border-dashed border-border-subtle rounded-3xl cursor-pointer hover:bg-gold-light/20 transition-all"
+                            className={`flex items-center justify-between px-5 py-4 border border-dashed rounded-3xl cursor-pointer transition-all ${receiptImage ? 'bg-brand-teal/5 border-brand-teal' : 'bg-muted-bg/30 border-border-subtle hover:bg-gold-light/20'}`}
                           >
-                            <span className="text-xs font-bold text-gray-500 truncate">
-                              {receiptImage ? 'تم اختيار صورة الإيصال' : 'اضغط لرفع صورة الإيصال'}
+                            <span className={`text-xs font-bold truncate ${receiptImage ? 'text-brand-teal' : 'text-gray-500'}`}>
+                              {receiptImage ? 'تم اختيار صورة الإيصال بنجاح' : 'اضغط لرفع صورة الإيصال (إلزامي)'}
                             </span>
-                            <ImageIcon className="w-4 h-4 text-gray-400" />
+                            <ImageIcon className={`w-4 h-4 ${receiptImage ? 'text-brand-teal' : 'text-gray-400'}`} />
                           </label>
                           {receiptImage && (
                             <div className="mt-2 flex items-center gap-2">
@@ -375,7 +379,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                     <div className="grid grid-cols-2 gap-3 pt-2">
                       <button
                         type="button"
-                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address}
+                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address || !receiptImage}
                         onClick={(e) => handleOrderSubmission(e, 'whatsapp')}
                         className="py-4 bg-green-600 text-white rounded-2xl font-bold text-xs hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
@@ -388,7 +392,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                       </button>
                       <button
                         type="button"
-                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address}
+                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address || !receiptImage}
                         onClick={(e) => handleOrderSubmission(e, 'email')}
                         className="py-4 bg-brand-purple text-white rounded-2xl font-bold text-xs hover:bg-brand-purple/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
