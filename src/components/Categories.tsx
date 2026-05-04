@@ -3,7 +3,7 @@ import { Category } from '../types';
 
 interface CategoriesProps {
   categories: Category[];
-  onCategoryClick: (name: string) => void;
+  onCategoryClick: (slug: string) => void;
 }
 
 export default function Categories({ categories, onCategoryClick }: CategoriesProps) {
@@ -26,7 +26,7 @@ export default function Categories({ categories, onCategoryClick }: CategoriesPr
           {categories.map((category, index) => (
             <motion.div
               key={category.id}
-              onClick={() => onCategoryClick(category.name)}
+              onClick={() => onCategoryClick(category.slug)}
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}

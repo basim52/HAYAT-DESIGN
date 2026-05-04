@@ -69,12 +69,28 @@ export const PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1579546671170-735c0997184b?q=80&w=800&auto=format&fit=crop',
   },
   {
+    id: 'p5-2',
+    name: 'طلب تصميم خاص',
+    category: 'تصاميم حسب الطلب',
+    description: 'خدمة التصميم حسب الطلب لأي فكرة تدور في ذهنك.',
+    price: 300,
+    image: 'https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop',
+  },
+  {
     id: 'p6',
     name: 'صندوق هدايا خشبي مزخرف',
     category: 'أعمال خشبية',
     description: 'صندوق خشبي فاخر مزين بزخارف إسلامية محفورة بالليزر.',
     price: 120,
     image: 'https://images.unsplash.com/photo-1590487988256-9ed24133863e?q=80&w=800&auto=format&fit=crop',
+  },
+  {
+    id: 'p3-2',
+    name: 'زينة ورقية معلقة',
+    category: 'تصاميم ورقية بالكاميو',
+    description: 'زينة ورقية مبتكرة للحفلات والمناسبات السعيدة.',
+    price: 45,
+    image: 'https://images.unsplash.com/photo-1517260911058-0fcfd733702f?q=80&w=800&auto=format&fit=crop',
   },
 ];
 

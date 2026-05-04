@@ -131,8 +131,8 @@ export default function App() {
         />
         <Categories 
           categories={categories} 
-          onCategoryClick={(catName) => {
-            const id = `category-section-${catName.replace(/\s+/g, '-')}`;
+          onCategoryClick={(slug) => {
+            const id = `category-section-${slug}`;
             const element = document.getElementById(id);
             if (element) {
               const offset = 80;
@@ -162,7 +162,7 @@ export default function App() {
           if (categoryProducts.length === 0) return null;
           
           return (
-            <div key={category.id} id={`category-section-${category.name.replace(/\s+/g, '-')}`}>
+            <div key={category.id} id={`category-section-${category.slug}`}>
               <ProductList 
                 title={category.name}
                 subtitle="بلمسة إبداعية"
