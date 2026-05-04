@@ -78,10 +78,33 @@ export const PRODUCTS: Product[] = [
   },
 ];
 
+export const PAYMENT_METHODS = [
+  {
+    id: 'arab-bank',
+    bankName: 'البنك العربي',
+    accountName: 'مؤسسة علم الحياة التجارية',
+    accountNumber: '0108095641480015',
+    iban: 'SA5830400108095641480015',
+    type: 'bank'
+  },
+  {
+    id: 'alahli-bank',
+    bankName: 'بنك الأهلي (SNB)',
+    accountName: 'حياة عبدالواحد الزاكي',
+    accountNumber: '11100093305006',
+    iban: 'SA3610000011100093305006',
+    type: 'bank'
+  },
+  {
+    id: 'stc-pay',
+    bankName: 'STC Pay',
+    accountName: 'حياة عبدالواحد الزاكي',
+    accountNumber: '0541356580',
+    type: 'digital'
+  }
+];
+
 export const BANK_DETAILS = {
-  bankName: 'بنك الراجحي',
-  accountName: 'مؤسسة حياة ديزاين للإنتاج الفني',
-  iban: 'SA03 8000 0000 1234 5678 9012',
   whatsappNumber: '966530593770',
   phoneNumber: '+966 53 059 3770',
 };

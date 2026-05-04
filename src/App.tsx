@@ -21,7 +21,7 @@ import { useAuth } from './AuthContext';
 import LoginModal from './components/LoginModal';
 
 export default function App() {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -135,7 +135,7 @@ export default function App() {
         />
       </main>
 
-      <Footer onAdminOpen={() => setIsAdminOpen(true)} />
+      <Footer isAdmin={isAdmin} onAdminOpen={() => setIsAdminOpen(true)} />
 
       <CartDrawer 
         isOpen={isCartOpen}

@@ -18,6 +18,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    phone: '',
+    address: '',
+  });
 
   // Sync state when profile loads or editing starts
   useEffect(() => {

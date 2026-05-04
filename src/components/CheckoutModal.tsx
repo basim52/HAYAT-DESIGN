@@ -1,7 +1,7 @@
-import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail } from 'lucide-react';
+import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, FormEvent, useEffect } from 'react';
-import { BANK_DETAILS } from '../constants';
+import { BANK_DETAILS, PAYMENT_METHODS } from '../constants';
 import { CartItem, UserProfile } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
@@ -34,11 +34,12 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderUrls, setOrderUrls] = useState<{ whatsappUrl: string; mailtoUrl: string } | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0]);
 
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const handleCopyIban = () => {
-    navigator.clipboard.writeText(BANK_DETAILS.iban);
+  const handleCopyValue = (value: string) => {
+    navigator.clipboard.writeText(value);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -166,35 +167,67 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
 
                 <div className="grid md:grid-cols-2 gap-12">
                   {/* Bank Details */}
-                  <div className="space-y-8">
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">اختر وسيلة الدفع</h3>
+                      <div className="grid grid-cols-3 gap-2">
+                        {PAYMENT_METHODS.map((method) => (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => setSelectedMethod(method)}
+                            className={`p-3 rounded-2xl border transition-all flex flex-col items-center gap-1 ${selectedMethod.id === method.id ? 'border-brand-purple bg-brand-purple/5 ring-1 ring-brand-purple' : 'border-border-subtle bg-white hover:border-gray-300'}`}
+                          >
+                            {method.type === 'bank' ? <Landmark className={`w-4 h-4 ${selectedMethod.id === method.id ? 'text-brand-purple' : 'text-gray-400'}`} /> : <Smartphone className={`w-4 h-4 ${selectedMethod.id === method.id ? 'text-brand-purple' : 'text-gray-400'}`} />}
+                            <span className={`text-[10px] font-bold ${selectedMethod.id === method.id ? 'text-brand-purple' : 'text-gray-500'}`}>{method.bankName}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="p-6 bg-gold-light/40 rounded-3xl border border-gold/10 relative overflow-hidden">
                       <div className="absolute -top-4 -left-4 w-24 h-24 bg-gold/5 rounded-full" />
                       <div className="flex items-center gap-3 mb-6">
-                        <Landmark className="w-6 h-6 text-gold" />
-                        <h3 className="font-bold">بيانات التحويل البنكي</h3>
+                        {selectedMethod.type === 'bank' ? <Landmark className="w-6 h-6 text-gold" /> : <Smartphone className="w-6 h-6 text-gold" />}
+                        <h3 className="font-bold">{selectedMethod.bankName}</h3>
                       </div>
                       <div className="space-y-4 text-sm">
                         <div>
-                          <p className="text-charcoal/40 mb-1">اسم البنك</p>
-                          <p className="font-bold">{BANK_DETAILS.bankName}</p>
-                        </div>
-                        <div>
                           <p className="text-charcoal/40 mb-1">اسم الحساب</p>
-                          <p className="font-bold">{BANK_DETAILS.accountName}</p>
+                          <p className="font-bold">{selectedMethod.accountName}</p>
                         </div>
-                        <div className="pt-2">
-                          <p className="text-charcoal/40 mb-1">رقم الآيبان (IBAN)</p>
-                          <div className="flex items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gold/10">
-                            <code className="text-xs font-mono font-bold tracking-wider">{BANK_DETAILS.iban}</code>
-                            <button 
-                              onClick={handleCopyIban}
-                              className="p-2 hover:bg-gold-light rounded-lg transition-colors flex-shrink-0"
-                              title="نسخ الآيبان"
-                            >
-                              {isCopied ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gold" />}
-                            </button>
+                        
+                        {selectedMethod.accountNumber && (
+                          <div>
+                            <p className="text-charcoal/40 mb-1">رقم الحساب</p>
+                            <div className="flex items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gold/10">
+                              <code className="text-xs font-mono font-bold tracking-wider">{selectedMethod.accountNumber}</code>
+                              <button 
+                                type="button"
+                                onClick={() => handleCopyValue(selectedMethod.accountNumber!)}
+                                className="p-2 hover:bg-gold-light rounded-lg transition-colors flex-shrink-0"
+                              >
+                                {isCopied ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gold" />}
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
+
+                        {selectedMethod.iban && (
+                          <div>
+                            <p className="text-charcoal/40 mb-1">رقم الآيبان (IBAN)</p>
+                            <div className="flex items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gold/10">
+                              <code className="text-xs font-mono font-bold tracking-wider">{selectedMethod.iban}</code>
+                              <button 
+                                type="button"
+                                onClick={() => handleCopyValue(selectedMethod.iban!)}
+                                className="p-2 hover:bg-gold-light rounded-lg transition-colors flex-shrink-0"
+                              >
+                                {isCopied ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gold" />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -203,7 +236,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                         <CheckCircle2 className="w-6 h-6" />
                       </div>
                       <p className="text-xs text-green-800 leading-relaxed">
-                        يرجى تحويل مبلغ <span className="font-bold">{total} ر.س</span> ثم تعبئة بياناتك لإرسال الطلب عبر الواتساب مع إرفاق صورة التحويل.
+                        يرجى تحويل مبلغ <span className="font-bold">{total} ر.س</span> عبر <span className="font-bold">{selectedMethod.bankName}</span> ثم تعبئة بياناتك لإكمال الطلب.
                       </p>
                     </div>
                   </div>

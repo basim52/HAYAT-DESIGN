@@ -3,9 +3,10 @@ import { BANK_DETAILS } from '../constants';
 
 interface FooterProps {
   onAdminOpen?: () => void;
+  isAdmin?: boolean;
 }
 
-export default function Footer({ onAdminOpen }: FooterProps) {
+export default function Footer({ onAdminOpen, isAdmin }: FooterProps) {
   return (
     <footer id="contact" className="bg-white border-t border-border-subtle py-20">
       <div className="container mx-auto px-6">
@@ -67,7 +68,7 @@ export default function Footer({ onAdminOpen }: FooterProps) {
                 <span>hayat.desiign@gmail.com</span>
                 <Mail className="w-4 h-4 text-gold" />
               </li>
-              {onAdminOpen && (
+              {isAdmin && onAdminOpen && (
                 <li className="pt-4 mt-4 border-t border-border-subtle">
                   <button 
                     onClick={onAdminOpen}

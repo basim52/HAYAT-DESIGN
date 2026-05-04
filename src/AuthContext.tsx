@@ -18,6 +18,8 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
 });
 
+const ADMIN_EMAILS = ['hayat.desiign@gmail.com', 'basim5252@gmail.com'];
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -40,7 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               id: firebaseUser.uid,
               fullName: firebaseUser.displayName || '',
               email: firebaseUser.email || '',
-              isAdmin: firebaseUser.email === 'hayat.desiign@gmail.com'
+              isAdmin: ADMIN_EMAILS.includes(firebaseUser.email || '')
             };
             await setDoc(profileRef, newProfile);
             setProfile(newProfile);
@@ -61,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const isAdmin = profile?.isAdmin || user?.email === 'hayat.desiign@gmail.com';
+  const isAdmin = profile?.isAdmin || (user?.email && ADMIN_EMAILS.includes(user.email));
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, isAdmin }}>
