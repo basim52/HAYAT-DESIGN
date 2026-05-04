@@ -39,7 +39,6 @@ export default function Footer({ onAdminOpen, isAdmin }: FooterProps) {
               </a>
               <a 
                 href="mailto:hayat.desiign@gmail.com" 
-                target="_blank"
                 className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center hover:bg-gold-light/20 transition-colors group"
                 title="Email"
               >
@@ -85,7 +84,6 @@ export default function Footer({ onAdminOpen, isAdmin }: FooterProps) {
               <li className="flex items-center justify-end gap-3 group">
                 <a 
                   href="mailto:hayat.desiign@gmail.com" 
-                  target="_blank"
                   className="flex items-center gap-3 hover:text-gold transition-colors"
                 >
                   <span>hayat.desiign@gmail.com</span>
