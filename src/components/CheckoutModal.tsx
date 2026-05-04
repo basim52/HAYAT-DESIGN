@@ -111,10 +111,12 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
       if (preference === 'whatsapp') {
         window.open(whatsappUrl, '_blank');
       } else {
-        // Use a hidden anchor to trigger mailto more reliably
-        const link = document.createElement('a');
-        link.href = mailtoUrl;
-        link.click();
+        // More robust way to trigger mailto
+        try {
+          window.location.href = mailtoUrl;
+        } catch (e) {
+          console.error("Failed to trigger mailto directly, relying on button click", e);
+        }
       }
       
       setShowSuccess(true);
@@ -168,6 +170,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                       ) : (
                         <a 
                           href={orderUrls.mailtoUrl}
+                          target="_blank"
                           className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors shadow-lg shadow-brand-purple/20"
                         >
                           <Mail className="w-5 h-5" />
