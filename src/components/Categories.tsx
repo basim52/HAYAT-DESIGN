@@ -28,9 +28,9 @@ export default function Categories({ categories }: CategoriesProps) {
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ scale: 1.02 }}
-              className="relative group cursor-pointer overflow-hidden rounded-[32px] aspect-[4/5] border border-border-subtle lux-shadow"
+              transition={{ delay: index * 0.1, duration: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              className="relative group cursor-pointer overflow-hidden rounded-[32px] aspect-video border border-border-subtle lux-shadow transition-all duration-300"
             >
               <img
                 src={category.image}

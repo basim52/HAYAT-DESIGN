@@ -31,17 +31,17 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
           <h3 className="font-extrabold text-[11px] md:text-base mb-0.5 md:mb-1 text-[#2C2C2C] line-clamp-1">{product.name}</h3>
           <span className="text-[9px] md:text-[10px] text-gray-400 font-bold uppercase tracking-widest block mb-2 md:mb-4">{product.category}</span>
           
-          <div className="text-gold font-extrabold text-sm md:text-lg flex items-center gap-1">
+          <div className="text-[#008077] font-black text-sm md:text-lg flex items-center gap-1">
             <span>{product.price}</span>
-            <span className="text-[9px] font-medium text-gray-400">ر.س</span>
+            <span className="text-[9px] font-bold text-gray-500">ر.س</span>
           </div>
         </div>
         
         <button
           onClick={() => onAddToCart(product)}
-          className="text-[10px] md:text-xs font-extrabold border-b border-gold/30 hover:border-gold pb-0.5 text-charcoal transition-all whitespace-nowrap flex items-center gap-1 md:gap-2 group/btn w-fit"
+          className="px-6 py-2 bg-brand-purple text-white rounded-xl text-[10px] md:text-xs font-extrabold hover:bg-brand-purple/90 transition-all whitespace-nowrap flex items-center justify-center gap-1 md:gap-2 group/btn w-full md:w-fit shadow-md shadow-brand-purple/20"
         >
-          أضف
+          أضف للسلة
           <Plus className="w-3 h-3 group-hover:rotate-90 transition-transform" />
         </button>
       </div>
