@@ -1,4 +1,4 @@
-import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import { Product, Category, Order } from '../types';
@@ -166,6 +166,17 @@ export default function AdminPanel({
     } catch (err) {
       console.error(err);
       alert('خطأ أثناء تحديث حالة الطلب');
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا الطلب نهائياً؟')) {
+      try {
+        await deleteDoc(doc(db, 'orders', orderId));
+      } catch (err) {
+        console.error(err);
+        alert('خطأ أثناء حذف الطلب');
+      }
     }
   };
 
@@ -531,18 +542,63 @@ export default function AdminPanel({
                   <div className="space-y-8">
                     <div className="flex justify-between items-center">
                       <div className="flex flex-col">
-                        <h3 className="text-xl font-bold">إدارة الطلبات</h3>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">متابعة المبيعات والعملاء</p>
+                        <h3 className="text-xl font-bold">إدارة الطلبات والنظام المحاسبي</h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">متابعة الأداء المالي والمبيعات</p>
                       </div>
-                      <div className="flex flex-wrap gap-4">
-                        <div className="bg-white px-4 py-2 rounded-xl border border-border-subtle flex flex-col items-center">
-                          <span className="text-[9px] text-gray-400 font-bold uppercase">إجمالي الطلبات</span>
-                          <span className="text-sm font-extrabold">{orders.length}</span>
+                    </div>
+
+                    {/* Accounting Dashboard */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-white p-6 rounded-[32px] border border-border-subtle shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-brand-purple/10 rounded-2xl flex items-center justify-center text-brand-purple">
+                            <TrendingUp className="w-5 h-5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">إجمالي المبيعات</span>
                         </div>
-                        <div className="bg-white px-4 py-2 rounded-xl border border-border-subtle flex flex-col items-center text-brand-teal">
-                          <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">المبيعات</span>
-                          <span className="text-sm font-extrabold">{orders.reduce((sum, o) => sum + o.total, 0)} ر.س</span>
+                        <p className="text-2xl font-extrabold text-charcoal">
+                          {orders.reduce((sum, o) => sum + o.total, 0).toLocaleString()} <span className="text-xs font-medium text-gray-400">ر.س</span>
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-2 font-bold uppercase">من {orders.length} طلب</p>
+                      </div>
+
+                      <div className="bg-white p-6 rounded-[32px] border border-border-subtle shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-brand-teal/10 rounded-2xl flex items-center justify-center text-brand-teal">
+                            <CheckCircle className="w-5 h-5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">المبالغ المحصلة</span>
                         </div>
+                        <p className="text-2xl font-extrabold text-charcoal">
+                          {orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.total, 0).toLocaleString()} <span className="text-xs font-medium text-gray-400">ر.س</span>
+                        </p>
+                        <p className="text-[10px] text-brand-teal mt-2 font-bold uppercase">للطلبات المكتملة فقط</p>
+                      </div>
+
+                      <div className="bg-white p-6 rounded-[32px] border border-border-subtle shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-yellow-500/10 rounded-2xl flex items-center justify-center text-yellow-600">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">مبالغ قيد الانتظار</span>
+                        </div>
+                        <p className="text-2xl font-extrabold text-charcoal">
+                          {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0).toLocaleString()} <span className="text-xs font-medium text-gray-400">ر.س</span>
+                        </p>
+                        <p className="text-[10px] text-yellow-600 mt-2 font-bold uppercase">الطلبات الجارية</p>
+                      </div>
+
+                      <div className="bg-white p-6 rounded-[32px] border border-border-subtle shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-brand-purple/10 rounded-2xl flex items-center justify-center text-brand-purple">
+                            <BarChart2 className="w-5 h-5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">متوسط الطلب</span>
+                        </div>
+                        <p className="text-2xl font-extrabold text-charcoal">
+                          {orders.length > 0 ? Math.round(orders.reduce((sum, o) => sum + o.total, 0) / orders.length).toLocaleString() : 0} <span className="text-xs font-medium text-gray-400">ر.س</span>
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-2 font-bold uppercase">قيمة السلة المتوسطة</p>
                       </div>
                     </div>
 
@@ -592,6 +648,16 @@ export default function AdminPanel({
                               <div className="p-2 bg-muted-bg rounded-lg text-gray-300">
                                 {expandedOrderId === order.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                               </div>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteOrder(order.id);
+                                }}
+                                className="p-2 bg-red-50 text-red-300 hover:text-red-500 rounded-lg transition-colors"
+                                title="حذف الطلب"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
                             </div>
 
                             {/* Detailed View */}

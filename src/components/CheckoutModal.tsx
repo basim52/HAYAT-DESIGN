@@ -103,17 +103,13 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
       
       const subject = `طلب جديد لباسم حياة ديزاين - ${formData.customerName}`;
       const emailBody = message.replace(/\*/g, ''); 
-      const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+      const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody.substring(0, 1500))}`;
 
       setOrderUrls({ whatsappUrl, mailtoUrl });
       setPreferredMethod(preference);
       
       if (preference === 'whatsapp') {
         window.open(whatsappUrl, '_blank');
-      } else {
-        // Mailto links are often blocked when triggered programmatically in iframes
-        // We will show the success screen where the user can click the button
-        console.log("Order saved, user should click the email button to send");
       }
       
       setShowSuccess(true);
@@ -167,6 +163,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                       ) : (
                         <a 
                           href={orderUrls.mailtoUrl}
+                          target="_top"
                           className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors shadow-lg shadow-brand-purple/20"
                         >
                           <Mail className="w-5 h-5" />
