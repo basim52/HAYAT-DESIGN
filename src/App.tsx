@@ -11,6 +11,7 @@ import ProductList from './components/ProductList';
 import CartDrawer from './components/CartDrawer';
 import CheckoutModal from './components/CheckoutModal';
 import AdminPanel from './components/AdminPanel';
+import Policies from './components/Policies';
 import Footer from './components/Footer';
 import { CartItem, Product, Category } from './types';
 import { PRODUCTS as initialProducts, CATEGORIES as initialCategories } from './constants';
@@ -133,6 +134,7 @@ export default function App() {
           products={products}
           onAddToCart={handleAddToCart} 
         />
+        <Policies />
       </main>
 
       <Footer isAdmin={isAdmin} onAdminOpen={() => setIsAdminOpen(true)} />

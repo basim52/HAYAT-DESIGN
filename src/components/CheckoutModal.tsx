@@ -37,6 +37,8 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0]);
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
 
+  const [preferredMethod, setPreferredMethod] = useState<'whatsapp' | 'email' | null>(null);
+
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -104,11 +106,15 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
       const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
 
       setOrderUrls({ whatsappUrl, mailtoUrl });
+      setPreferredMethod(preference);
       
       if (preference === 'whatsapp') {
         window.open(whatsappUrl, '_blank');
       } else {
-        window.location.href = mailtoUrl;
+        // Use a hidden anchor to trigger mailto more reliably
+        const link = document.createElement('a');
+        link.href = mailtoUrl;
+        link.click();
       }
       
       setShowSuccess(true);
@@ -149,22 +155,25 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                 <div className="flex flex-col gap-3 max-w-xs mx-auto">
                   {orderUrls && (
                     <>
-                      <a 
-                        href={orderUrls.whatsappUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors"
-                      >
-                        <MessageCircle className="w-5 h-5" />
-                        إرسال عبر واتساب
-                      </a>
-                      <a 
-                        href={orderUrls.mailtoUrl}
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors"
-                      >
-                        <Mail className="w-5 h-5" />
-                        إرسال عبر البريد الإلكتروني
-                      </a>
+                      {preferredMethod === 'whatsapp' ? (
+                        <a 
+                          href={orderUrls.whatsappUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-600/20"
+                        >
+                          <MessageCircle className="w-5 h-5" />
+                          إرسال عبر واتساب
+                        </a>
+                      ) : (
+                        <a 
+                          href={orderUrls.mailtoUrl}
+                          className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors shadow-lg shadow-brand-purple/20"
+                        >
+                          <Mail className="w-5 h-5" />
+                          إرسال عبر البريد الإلكتروني
+                        </a>
+                      )}
                     </>
                   )}
                   <button 
@@ -172,7 +181,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                       setShowSuccess(false);
                       onClose();
                     }}
-                    className="mt-4 text-xs font-bold text-gray-400 hover:text-charcoal transition-colors border-b border-transparent hover:border-gray-200 pb-1"
+                    className="mt-4 text-xs font-bold text-gray-400 hover:text-charcoal transition-colors underline-offset-4 hover:underline"
                   >
                     إغلاق النافذة والعودة للمتجر
                   </button>

@@ -1,4 +1,4 @@
-import { Instagram, Twitter, Mail, Phone, Settings, MessageCircle } from 'lucide-react';
+import { Instagram, Music2, Mail, Phone, Settings, MessageCircle } from 'lucide-react';
 import { BANK_DETAILS } from '../constants';
 
 interface FooterProps {
@@ -8,9 +8,9 @@ interface FooterProps {
 
 export default function Footer({ onAdminOpen, isAdmin }: FooterProps) {
   return (
-    <footer id="contact" className="bg-white border-t border-border-subtle py-20">
+    <footer id="contact" className="bg-white border-t border-border-subtle py-20 text-right">
       <div className="container mx-auto px-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 border-b border-border-subtle pb-16 text-right">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 border-b border-border-subtle pb-16">
           <div className="md:col-span-1">
             <div className="flex items-center justify-end gap-3 mb-6">
               <span className="text-2xl font-bold tracking-tighter text-gold">حياة ديزاين</span>
@@ -19,14 +19,30 @@ export default function Footer({ onAdminOpen, isAdmin }: FooterProps) {
               نحن مؤسسة سعودية متخصصة في الإنتاج الفني المبتكر. نسعى لإثراء مساحاتكم عبر تصاميم فريدة تعكس شخصيتكم.
             </p>
             <div className="flex items-center justify-end gap-4">
-              <a href="#" className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center hover:bg-muted-bg transition-colors">
-                <Instagram className="w-4 h-4 text-gray-400" />
+              <a 
+                href="https://www.instagram.com/hayat_desiign?igsh=MWFtYmdocWhwN2loMA==" 
+                target="_blank"
+                rel="noreferrer"
+                className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center hover:bg-gold-light/20 transition-colors group"
+                title="Instagram"
+              >
+                <Instagram className="w-4 h-4 text-gray-400 group-hover:text-gold" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center hover:bg-muted-bg transition-colors">
-                <Twitter className="w-4 h-4 text-gray-400" />
+              <a 
+                href="https://www.tiktok.com/@hayat_desiign?_r=1&_t=ZS-965E9mjEoi5" 
+                target="_blank"
+                rel="noreferrer"
+                className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center hover:bg-gold-light/20 transition-colors group"
+                title="TikTok"
+              >
+                <Music2 className="w-4 h-4 text-gray-400 group-hover:text-gold" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center hover:bg-muted-bg transition-colors">
-                <Mail className="w-4 h-4 text-gray-400" />
+              <a 
+                href="mailto:hayat.desiign@gmail.com" 
+                className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center hover:bg-gold-light/20 transition-colors group"
+                title="Email"
+              >
+                <Mail className="w-4 h-4 text-gray-400 group-hover:text-gold" />
               </a>
             </div>
           </div>
@@ -37,6 +53,7 @@ export default function Footer({ onAdminOpen, isAdmin }: FooterProps) {
               <li><a href="#home" className="hover:text-gold transition-colors">الرئيسية</a></li>
               <li><a href="#categories" className="hover:text-gold transition-colors">أقسامنا</a></li>
               <li><a href="#products" className="hover:text-gold transition-colors">منتجاتنا</a></li>
+              <li><a href="#policies" className="hover:text-gold transition-colors">سياسات المتجر</a></li>
             </ul>
           </div>
 
@@ -64,14 +81,21 @@ export default function Footer({ onAdminOpen, isAdmin }: FooterProps) {
                 </a>
                 <Phone className="w-4 h-4 text-gold group-hover:text-gold" />
               </li>
-              <li className="flex items-center justify-end gap-3">
-                <span>hayat.desiign@gmail.com</span>
-                <Mail className="w-4 h-4 text-gold" />
+              <li className="flex items-center justify-end gap-3 group">
+                <a 
+                  href="mailto:hayat.desiign@gmail.com" 
+                  className="flex items-center gap-3 hover:text-gold transition-colors"
+                >
+                  <span>hayat.desiign@gmail.com</span>
+                  <Mail className="w-4 h-4 text-gold" />
+                </a>
               </li>
               {isAdmin && onAdminOpen && (
                 <li className="pt-4 mt-4 border-t border-border-subtle">
                   <button 
-                    onClick={onAdminOpen}
+                    onClick={() => {
+                      if (isAdmin) onAdminOpen();
+                    }}
                     className="flex items-center justify-end gap-2 text-brand-purple hover:text-brand-teal transition-colors w-full"
                   >
                     <span>إدارة المتجر</span>

@@ -18,6 +18,7 @@ export default function Navbar({ cartCount, onCartClick, onNavClick, onLoginClic
     { name: 'الرئيسية', id: 'home' },
     { name: 'أقسامنا', id: 'categories' },
     { name: 'منتجاتنا', id: 'products' },
+    { name: 'سياسات المتجر', id: 'policies' },
     { name: 'تواصل معنا', id: 'contact' },
   ];
 
