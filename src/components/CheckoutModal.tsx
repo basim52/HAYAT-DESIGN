@@ -33,6 +33,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   const [isCopied, setIsCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [orderUrls, setOrderUrls] = useState<{ whatsappUrl: string; mailtoUrl: string } | null>(null);
 
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -47,7 +48,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
     setIsSubmitting(true);
     
     try {
-      // Save to Firestore (Always save, even if not logged in - use a guest ID or current auth uid)
+      // Save to Firestore
       const orderData = {
         userId: userProfile?.id || 'guest',
         ...formData,
@@ -76,16 +77,14 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
       const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
       
       const subject = `طلب جديد من حياة ديزاين - ${formData.customerName}`;
-      const emailBody = message.replace(/\*/g, ''); // Remove bold markers for email
+      const emailBody = message.replace(/\*/g, ''); 
       const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
 
-      // Store selection methods in constants for the success screen
-      (window as any)._lastOrderUrls = { whatsappUrl, mailtoUrl };
+      setOrderUrls({ whatsappUrl, mailtoUrl });
       
-      // Open WhatsApp by default as it's the primary channel
+      // Open WhatsApp by default
       window.open(whatsappUrl, '_blank');
       
-      // Show success screen with both options
       setShowSuccess(true);
     } catch (err) {
       console.error(err);
@@ -122,22 +121,26 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                   لقد حفظنا بيانات طلبك في النظام بجاح. يرجى إتمام الإرسال عبر إحدى الوسائل التالية لتأكيد الدفع:
                 </p>
                 <div className="flex flex-col gap-3 max-w-xs mx-auto">
-                  <a 
-                    href={(window as any)._lastOrderUrls?.whatsappUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors"
-                  >
-                    <MessageCircle className="w-5 h-5" />
-                    إرسال عبر واتساب
-                  </a>
-                  <a 
-                    href={(window as any)._lastOrderUrls?.mailtoUrl}
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors"
-                  >
-                    <Mail className="w-5 h-5" />
-                    إرسال عبر البريد الإلكتروني
-                  </a>
+                  {orderUrls && (
+                    <>
+                      <a 
+                        href={orderUrls.whatsappUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors"
+                      >
+                        <MessageCircle className="w-5 h-5" />
+                        إرسال عبر واتساب
+                      </a>
+                      <a 
+                        href={orderUrls.mailtoUrl}
+                        className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors"
+                      >
+                        <Mail className="w-5 h-5" />
+                        إرسال عبر البريد الإلكتروني
+                      </a>
+                    </>
+                  )}
                   <button 
                     onClick={() => {
                       setShowSuccess(false);
@@ -145,7 +148,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                     }}
                     className="mt-4 text-xs font-bold text-gray-400 hover:text-charcoal transition-colors border-b border-transparent hover:border-gray-200 pb-1"
                   >
-                    اغلاق النافذة والعودة للمتجر
+                    إغلاق النافذة والعودة للمتجر
                   </button>
                 </div>
               </div>
