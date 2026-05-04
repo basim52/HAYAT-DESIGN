@@ -3,9 +3,10 @@ import { Category } from '../types';
 
 interface CategoriesProps {
   categories: Category[];
+  onCategoryClick: (name: string) => void;
 }
 
-export default function Categories({ categories }: CategoriesProps) {
+export default function Categories({ categories, onCategoryClick }: CategoriesProps) {
   return (
     <section id="categories" className="py-24 bg-white">
       <div className="container mx-auto px-6">
@@ -25,6 +26,7 @@ export default function Categories({ categories }: CategoriesProps) {
           {categories.map((category, index) => (
             <motion.div
               key={category.id}
+              onClick={() => onCategoryClick(category.name)}
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}

@@ -129,11 +129,51 @@ export default function App() {
           onShopClick={() => handleNavClick('products')} 
           heroImage={heroImage}
         />
-        <Categories categories={categories} />
-        <ProductList 
-          products={products}
-          onAddToCart={handleAddToCart} 
+        <Categories 
+          categories={categories} 
+          onCategoryClick={(catName) => {
+            const id = `category-section-${catName.replace(/\s+/g, '-')}`;
+            const element = document.getElementById(id);
+            if (element) {
+              const offset = 80;
+              const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+              window.scrollTo({
+                top: elementPosition - offset,
+                behavior: 'smooth'
+              });
+            }
+          }}
         />
+        
+        {/* All Products Section with Filters */}
+        <div id="products">
+          <ProductList 
+            title="جميع"
+            subtitle="المنتجات"
+            products={products}
+            onAddToCart={handleAddToCart} 
+            showFilters={true}
+          />
+        </div>
+
+        {/* Individual Category Sections */}
+        {categories.map((category) => {
+          const categoryProducts = products.filter(p => p.category === category.name);
+          if (categoryProducts.length === 0) return null;
+          
+          return (
+            <div key={category.id} id={`category-section-${category.name.replace(/\s+/g, '-')}`}>
+              <ProductList 
+                title={category.name}
+                subtitle="بلمسة إبداعية"
+                products={categoryProducts}
+                onAddToCart={handleAddToCart} 
+                showFilters={false}
+              />
+            </div>
+          );
+        })}
+        
         <Policies />
       </main>
 

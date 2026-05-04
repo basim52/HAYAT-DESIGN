@@ -2,16 +2,10 @@ import { Category, Product } from './types';
 
 export const CATEGORIES: Category[] = [
   {
-    id: 'cat-1',
-    name: 'أعمال خشبية',
-    slug: 'wood-work',
-    image: 'https://images.unsplash.com/photo-1589519160732-57fc498494f8?q=80&w=800&auto=format&fit=crop',
-  },
-  {
-    id: 'cat-2',
-    name: 'منتجات أكريليك',
-    slug: 'acrylic-products',
-    image: 'https://images.unsplash.com/photo-1579546671170-735c0997184b?q=80&w=800&auto=format&fit=crop',
+    id: 'cat-4',
+    name: 'تصاميم حسب الطلب',
+    slug: 'custom-designs',
+    image: 'https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop',
   },
   {
     id: 'cat-3',
@@ -20,10 +14,16 @@ export const CATEGORIES: Category[] = [
     image: 'https://images.unsplash.com/photo-1517260911058-0fcfd733702f?q=80&w=800&auto=format&fit=crop',
   },
   {
-    id: 'cat-4',
-    name: 'تصاميم حسب الطلب',
-    slug: 'custom-designs',
-    image: 'https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop',
+    id: 'cat-2',
+    name: 'منتجات أكريليك',
+    slug: 'acrylic-products',
+    image: 'https://images.unsplash.com/photo-1579546671170-735c0997184b?q=80&w=800&auto=format&fit=crop',
+  },
+  {
+    id: 'cat-1',
+    name: 'أعمال خشبية',
+    slug: 'wood-work',
+    image: 'https://images.unsplash.com/photo-1589519160732-57fc498494f8?q=80&w=800&auto=format&fit=crop',
   },
 ];
 
