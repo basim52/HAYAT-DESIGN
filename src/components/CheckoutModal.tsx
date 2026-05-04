@@ -41,7 +41,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleWhatsAppOrder = async (e: FormEvent) => {
+  const handleOrderSubmission = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
@@ -62,19 +62,19 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
         .map(item => `• ${item.name} (الكمية: ${item.quantity}) - السعر: ${item.price * item.quantity} ر.س`)
         .join('\n');
 
-      const message = `*طلب جديد من حياة ديزاين*\n\n` +
-        `*بيانات العميل:*\n` +
+      const subject = `طلب جديد من حياة ديزاين - ${formData.customerName}`;
+      const body = `طلب جديد من حياة ديزاين\n\n` +
+        `بيانات العميل:\n` +
         `الاسم: ${formData.customerName}\n` +
         `رقم الجوال: ${formData.phone}\n` +
         `العنوان: ${formData.address}\n\n` +
-        `*تفاصيل الطلب:*\n${itemsList}\n\n` +
-        `*الإجمالي: ${total} ر.س*\n\n` +
-        `سأقوم بإرسال صورة إيصال التحويل البنكي الآن.`;
+        `تفاصيل الطلب:\n${itemsList}\n\n` +
+        `الإجمالي: ${total} ر.س\n\n` +
+        `سأقوم بإرفاق صورة إيصال التحويل البنكي في المرفقات.`;
 
-      const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
+      const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       
-      window.open(whatsappUrl, '_blank');
+      window.location.href = mailtoUrl;
       onClose();
     } catch (err) {
       console.error(err);
@@ -145,49 +145,73 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 p-4 bg-green-50 rounded-2xl border border-green-100">
-                  <div className="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                  <div className="w-10 h-10 bg-brand-purple text-white rounded-full flex items-center justify-center flex-shrink-0">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <p className="text-xs text-green-800 leading-relaxed">
-                    يرجى تحويل مبلغ <span className="font-bold">{total} ر.س</span> ثم تعبئة بياناتك لإرسال الطلب عبر الواتساب مع إرفاق صورة التحويل.
+                  <p className="text-xs text-blue-800 leading-relaxed">
+                    يرجى تحويل مبلغ <span className="font-bold">{total} ر.س</span> ثم تعبئة بياناتك لإرسال الطلب عبر البريد الإلكتروني مع إرفاق صورة التحويل.
                   </p>
                 </div>
               </div>
 
               {/* Customer Form */}
-              <form onSubmit={handleWhatsAppOrder} className="space-y-5">
-                <h3 className="font-bold mb-4">بيانات التوصيل</h3>
+              <form onSubmit={handleOrderSubmission} className="space-y-5">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold">بيانات التوصيل</h3>
+                  {!userProfile && (
+                    <button 
+                      type="button" 
+                      onClick={onClose}
+                      className="text-[10px] font-bold text-brand-purple hover:underline"
+                    >
+                      تسجيل دخول لحفظ بياناتك؟
+                    </button>
+                  )}
+                </div>
+                
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold mr-2 text-charcoal/60">الاسم الكامل</label>
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">الاسم الكامل</label>
+                      <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                    </div>
                     <input
                       required
                       type="text"
                       placeholder="أدخل اسمك الثلاثي"
-                      className="w-full px-5 py-4 bg-body-bg border border-gold/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/30 transition-all"
+                      className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm"
                       value={formData.customerName}
                       onChange={e => setFormData({ ...formData, customerName: e.target.value })}
                     />
                   </div>
+
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold mr-2 text-charcoal/60">رقم الجوال</label>
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">رقم الجوال</label>
+                      <span className="text-[9px] text-red-500 font-bold">* مطلوب (05xxxxxxx)</span>
+                    </div>
                     <input
                       required
                       type="tel"
+                      pattern="^(05|5|9665)[0-9]{8}$"
                       placeholder="05xxxxxxx"
-                      className="w-full px-5 py-4 bg-body-bg border border-gold/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/30 transition-all"
+                      className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm text-right"
                       value={formData.phone}
                       onChange={e => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
+
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold mr-2 text-charcoal/60">عنوان التوصيل / الاستلام</label>
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">عنوان التوصيل / الاستلام</label>
+                      <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                    </div>
                     <textarea
                       required
                       placeholder="المدينة، الحي، اسم الشارع، تفاصيل أخرى"
                       rows={3}
-                      className="w-full px-5 py-4 bg-body-bg border border-gold/5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gold/30 transition-all resize-none"
+                      className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all resize-none text-sm"
                       value={formData.address}
                       onChange={e => setFormData({ ...formData, address: e.target.value })}
                     />
@@ -197,7 +221,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-5 bg-green-600 text-white rounded-[24px] font-bold text-lg hover:bg-green-700 transition-all duration-300 shadow-xl shadow-green-600/10 flex items-center justify-center gap-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-5 bg-brand-purple text-white rounded-[24px] font-bold text-lg hover:bg-brand-purple/90 transition-all duration-300 shadow-xl shadow-brand-purple/10 flex items-center justify-center gap-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <motion.div
@@ -208,7 +232,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                   ) : (
                     <>
                       <Send className="w-5 h-5 -rotate-45" />
-                      <span>إرسال الطلب وإيصال التحويل</span>
+                      <span>إرسال الطلب عبر البريد الإلكتروني</span>
                     </>
                   )}
                 </button>
