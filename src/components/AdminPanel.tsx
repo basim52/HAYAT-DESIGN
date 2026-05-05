@@ -27,7 +27,10 @@ export default function AdminPanel({
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [editingHero, setEditingHero] = useState(heroImage);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
+  const [banners, setBanners] = useState<{ id: string; image: string; title?: string; subtitle?: string; active: boolean }[]>([]);
+  const [isAddingBanner, setIsAddingBanner] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
@@ -44,21 +47,38 @@ export default function AdminPanel({
     slug: '',
   });
 
+  const [newBanner, setNewBanner] = useState({
+    image: '',
+    title: '',
+    subtitle: '',
+    active: true
+  });
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   // Image Editor State
   const [imageToEdit, setImageToEdit] = useState<{ src: string, callback: (cropped: string) => void } | null>(null);
 
-  // Fetch orders when admin panel opens and tab is orders
+  // Fetch orders and banners
   useEffect(() => {
     if (isOpen && isAdmin) {
-      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
-      const unsub = onSnapshot(q, (snapshot) => {
+      const qOrders = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+      const unsubOrders = onSnapshot(qOrders, (snapshot) => {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
         setOrders(docs);
       });
-      return unsub;
+
+      const qBanners = query(collection(db, 'banners'));
+      const unsubBanners = onSnapshot(qBanners, (snapshot) => {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        setBanners(docs);
+      });
+
+      return () => {
+        unsubOrders();
+        unsubBanners();
+      };
     }
   }, [isOpen, isAdmin]);
 
@@ -124,12 +144,65 @@ export default function AdminPanel({
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      setIsSubmitting(true);
       const slug = newCategory.name?.toLowerCase().replace(/\s+/g, '-') || `cat-${Date.now()}`;
-      await addDoc(collection(db, 'categories'), { ...newCategory, slug });
+      
+      if (editingCategoryId) {
+        await updateDoc(doc(db, 'categories', editingCategoryId), { ...newCategory, slug });
+        setEditingCategoryId(null);
+      } else {
+        await addDoc(collection(db, 'categories'), { ...newCategory, slug });
+      }
+      
       setIsAddingCategory(false);
-      setNewCategory({ name: '', image: '' });
+      setNewCategory({ name: '', image: '', slug: '' });
     } catch (err) {
       console.error(err);
+      alert('خطأ أثناء حفظ القسم');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditCategory = (category: Category) => {
+    setNewCategory(category);
+    setEditingCategoryId(category.id);
+    setIsAddingCategory(true);
+  };
+
+  const handleAddBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSubmitting(true);
+      if (editingBannerId) {
+        await updateDoc(doc(db, 'banners', editingBannerId), newBanner);
+        setEditingBannerId(null);
+      } else {
+        await addDoc(collection(db, 'banners'), newBanner);
+      }
+      setIsAddingBanner(false);
+      setNewBanner({ image: '', title: '', subtitle: '', active: true });
+    } catch (err) {
+      console.error(err);
+      alert('خطأ أثناء حفظ الغلاف');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditBanner = (banner: any) => {
+    setNewBanner(banner);
+    setEditingBannerId(banner.id);
+    setIsAddingBanner(true);
+  };
+
+  const handleRemoveBanner = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا الغلاف؟')) {
+      try {
+        await deleteDoc(doc(db, 'banners', id));
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -150,18 +223,6 @@ export default function AdminPanel({
       } catch (err) {
         console.error(err);
       }
-    }
-  };
-
-  const handleUpdateHero = async () => {
-    try {
-      setIsSubmitting(true);
-      await setDoc(doc(db, 'config', 'general'), { heroImage: editingHero });
-      alert('تم تحديث صورة الغلاف بنجاح');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -407,48 +468,145 @@ export default function AdminPanel({
                 )}
 
                 {activeTab === 'hero' && (
-                  <div className="max-w-2xl mx-auto space-y-8">
-                    <h3 className="text-xl font-bold">صورة الغلاف الرئيسية</h3>
-                    <div className="bg-white p-8 rounded-[40px] border border-border-subtle shadow-sm flex flex-col items-center">
-                      <div className="w-full aspect-[2/1] rounded-3xl overflow-hidden mb-8 border border-border-subtle">
-                        <img src={editingHero} alt="Hero Preview" className="w-full h-full object-cover" />
+                  <div className="space-y-8">
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <h3 className="text-xl font-bold">إدارة أغلفة المتجر (Banners)</h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">يمكنك إضافة أكثر من غلاف ليظهر في الصفحة الرئيسية</p>
                       </div>
-                      <div className="w-full space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-gray-400 px-2 uppercase tracking-widest">تحديث صورة الغلاف</label>
-                          <div className="flex gap-3">
-                            <input 
-                              type="text" 
-                              className="flex-1 p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
-                              value={editingHero}
-                              onChange={(e) => setEditingHero(e.target.value)}
-                              placeholder="رابط الصورة المباشر"
-                            />
-                            <label className="p-4 bg-white border border-border-subtle rounded-2xl cursor-pointer hover:bg-muted-bg transition-colors flex items-center justify-center">
-                              <ImageIcon className="w-5 h-5 text-brand-purple" />
-                              <input 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/*" 
-                                onChange={(e) => handleFileUpload(e, (img) => setEditingHero(img))}
-                              />
-                            </label>
-                            <button 
-                              onClick={handleUpdateHero}
-                              disabled={isSubmitting}
-                              className="bg-brand-purple text-white px-8 rounded-2xl font-bold text-xs flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-                            >
-                              {isSubmitting ? (
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              ) : (
-                                <Save className="w-4 h-4" />
-                              )}
-                              <span>حفظ التعديل</span>
-                            </button>
+                      <button 
+                        onClick={() => {
+                          setEditingBannerId(null);
+                          setNewBanner({ image: '', title: '', subtitle: '', active: true });
+                          setIsAddingBanner(true);
+                        }}
+                        className="flex items-center gap-2 bg-brand-purple text-white px-6 py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition-opacity"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>إضافة غلاف جديد</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <AnimatePresence>
+                        {isAddingBanner && (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white p-8 rounded-[40px] border-2 border-dashed border-brand-purple/30 shadow-xl"
+                          >
+                            <form onSubmit={handleAddBanner} className="space-y-6">
+                              <h4 className="font-bold text-sm text-brand-purple">
+                                {editingBannerId ? 'تعديل الغلاف' : 'إضافة غلاف جديد'}
+                              </h4>
+                              
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">صورة الغلاف</label>
+                                <div className="flex gap-2">
+                                  <input 
+                                    required
+                                    type="text" 
+                                    placeholder="رابط الصورة المباشر" 
+                                    className="flex-1 p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
+                                    value={newBanner.image}
+                                    onChange={e => setNewBanner({...newBanner, image: e.target.value})}
+                                  />
+                                  <label className="p-4 bg-white border border-border-subtle rounded-2xl cursor-pointer hover:bg-muted-bg transition-colors">
+                                    <ImageIcon className="w-5 h-5 text-brand-purple" />
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/*" 
+                                      onChange={(e) => handleFileUpload(e, (img) => setNewBanner({...newBanner, image: img}))}
+                                    />
+                                  </label>
+                                </div>
+                                {newBanner.image && (
+                                  <div className="relative aspect-video rounded-2xl overflow-hidden border border-border-subtle">
+                                    <img src={newBanner.image} className="w-full h-full object-cover" />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">العنوان الرئيسي</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder="مثال: تشكيلة الصيف" 
+                                    className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
+                                    value={newBanner.title}
+                                    onChange={e => setNewBanner({...newBanner, title: e.target.value})}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">العنوان الفرعي</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder="مثال: خصم 20%" 
+                                    className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
+                                    value={newBanner.subtitle}
+                                    onChange={e => setNewBanner({...newBanner, subtitle: e.target.value})}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <input 
+                                  type="checkbox"
+                                  id="active-banner"
+                                  checked={newBanner.active}
+                                  onChange={e => setNewBanner({...newBanner, active: e.target.checked})}
+                                  className="w-4 h-4 accent-brand-purple"
+                                />
+                                <label htmlFor="active-banner" className="text-xs font-bold text-gray-500">تفعيل الغلاف ليظهر في الموقع</label>
+                              </div>
+
+                              <div className="flex gap-2 pt-2">
+                                <button type="submit" disabled={isSubmitting} className="flex-1 bg-brand-purple text-white py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2">
+                                  {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                  {editingBannerId ? 'تحديث' : 'حفظ الغلاف'}
+                                </button>
+                                <button type="button" onClick={() => setIsAddingBanner(false)} className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-bold text-sm">إلغاء</button>
+                              </div>
+                            </form>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {banners.map((b) => (
+                        <div key={b.id} className="bg-white rounded-[40px] border border-border-subtle overflow-hidden flex flex-col group relative">
+                          <div className="aspect-[16/9] relative overflow-hidden">
+                            <img src={b.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                            {!b.active && (
+                              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
+                                <span className="px-4 py-2 bg-white/20 text-white rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/30">معطل</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-6 flex justify-between items-center bg-white">
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-sm truncate">{b.title || 'بدون عنوان'}</h4>
+                              <p className="text-[10px] text-gray-400 font-bold truncate">{b.subtitle || 'بدون عنوان فرعي'}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => handleEditBanner(b)}
+                                className="p-3 bg-muted-bg text-gray-400 hover:text-brand-purple rounded-xl transition-all"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleRemoveBanner(b.id)}
+                                className="p-3 bg-red-50 text-red-300 hover:text-red-500 rounded-xl transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <p className="text-[10px] text-gray-400 text-center">يقترح استخدام صور ذات أبعاد عريضة وجودة عالية (Unsplash مثلاً)</p>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -466,95 +624,87 @@ export default function AdminPanel({
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                       <AnimatePresence>
                         {isAddingCategory && (
                           <motion.div 
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white p-6 rounded-[32px] border-2 border-dashed border-brand-purple/30 shadow-xl"
+                            className="bg-white p-8 rounded-[40px] border-2 border-dashed border-brand-purple/30 shadow-xl z-10"
                           >
                             <form onSubmit={handleAddCategory} className="space-y-4">
-                              <h4 className="font-bold text-sm text-brand-purple">إضافة قسم جديد</h4>
+                              <h4 className="font-bold text-sm text-brand-purple">
+                                {editingCategoryId ? 'تعديل القسم' : 'إضافة قسم جديد'}
+                              </h4>
                               <input 
                                 required
                                 type="text" 
                                 placeholder="اسم القسم" 
-                                className="w-full p-3 bg-muted-bg rounded-xl text-xs outline-none border border-transparent focus:border-brand-purple"
+                                className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
                                 value={newCategory.name}
                                 onChange={e => setNewCategory({...newCategory, name: e.target.value})}
                               />
-                              <div className="flex gap-2">
-                                <input 
-                                  required
-                                  type="text" 
-                                  placeholder="رابط صورة القسم" 
-                                  className="flex-1 p-3 bg-muted-bg rounded-xl text-xs outline-none border border-transparent focus:border-brand-purple"
-                                  value={newCategory.image}
-                                  onChange={e => setNewCategory({...newCategory, image: e.target.value})}
-                                />
-                                <label className="p-3 bg-white border border-border-subtle rounded-xl cursor-pointer hover:bg-muted-bg transition-colors">
-                                  <ImageIcon className="w-4 h-4 text-brand-purple" />
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-400 px-1">صورة القسم</label>
+                                <div className="flex gap-2">
                                   <input 
-                                    type="file" 
-                                    className="hidden" 
-                                    accept="image/*" 
-                                    onChange={(e) => handleFileUpload(e, (img) => setNewCategory({...newCategory, image: img}))}
+                                    required
+                                    type="text" 
+                                    placeholder="رابط صورة القسم" 
+                                    className="flex-1 p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
+                                    value={newCategory.image}
+                                    onChange={e => setNewCategory({...newCategory, image: e.target.value})}
                                   />
-                                </label>
+                                  <label className="p-4 bg-white border border-border-subtle rounded-2xl cursor-pointer hover:bg-muted-bg transition-colors">
+                                    <ImageIcon className="w-5 h-5 text-brand-purple" />
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/*" 
+                                      onChange={(e) => handleFileUpload(e, (img) => setNewCategory({...newCategory, image: img}))}
+                                    />
+                                  </label>
+                                </div>
+                                {newCategory.image && (
+                                  <img src={newCategory.image} className="w-20 h-20 rounded-2xl object-cover border border-border-subtle" />
+                                )}
                               </div>
                               <div className="flex gap-2">
-                                <button type="submit" className="flex-1 bg-brand-purple text-white py-3 rounded-xl font-bold text-xs">إضافة</button>
-                                <button type="button" onClick={() => setIsAddingCategory(false)} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold text-xs">إلغاء</button>
+                                <button type="submit" disabled={isSubmitting} className="flex-1 bg-brand-purple text-white py-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2">
+                                  {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                  {editingCategoryId ? 'تحديث' : 'حفظ القسم'}
+                                </button>
+                                <button type="button" onClick={() => setIsAddingCategory(false)} className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-bold text-xs">إلغاء</button>
                               </div>
                             </form>
                           </motion.div>
                         )}
                       </AnimatePresence>
 
-                      {categories.map((c, idx) => (
+                      {categories.map((c) => (
                         <div key={c.id} className="bg-white p-6 rounded-[40px] border border-border-subtle flex gap-6 items-center group relative overflow-hidden">
                           <div className="w-24 h-24 rounded-3xl overflow-hidden flex-shrink-0 border border-border-subtle">
                             <img src={c.image} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                           </div>
-                          <div className="flex-1 space-y-3">
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">اسم القسم</label>
-                              <input 
-                                type="text" 
-                                className="w-full p-2.5 bg-muted-bg rounded-xl text-sm font-bold border border-transparent focus:border-brand-teal outline-none"
-                                value={c.name}
-                                onChange={(e) => handleUpdateCategory(c.id, { name: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">رابط الصورة</label>
-                              <div className="flex items-center gap-2">
-                                <input 
-                                  type="text" 
-                                  className="flex-1 text-[10px] bg-muted-bg p-2.5 rounded-xl outline-none border border-transparent focus:border-brand-teal"
-                                  value={c.image}
-                                  onChange={(e) => handleUpdateCategory(c.id, { image: e.target.value })}
-                                />
-                                <label className="p-2 bg-white border border-border-subtle rounded-xl cursor-pointer hover:bg-muted-bg transition-colors">
-                                  <ImageIcon className="w-3.5 h-3.5 text-brand-teal" />
-                                  <input 
-                                    type="file" 
-                                    className="hidden" 
-                                    accept="image/*" 
-                                    onChange={(e) => handleFileUpload(e, (img) => handleUpdateCategory(c.id, { image: img }))}
-                                  />
-                                </label>
-                              </div>
-                            </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-base truncate">{c.name}</h4>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">slug: {c.slug}</p>
                           </div>
-                          <button 
-                            onClick={() => handleRemoveCategory(c.id)}
-                            className="absolute top-4 left-4 p-2 text-gray-200 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex flex-col gap-2">
+                            <button 
+                              onClick={() => handleEditCategory(c)}
+                              className="p-3 bg-muted-bg text-gray-300 hover:text-brand-purple rounded-xl transition-all"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleRemoveCategory(c.id)}
+                              className="p-3 bg-red-50 text-red-200 hover:text-red-500 rounded-xl transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

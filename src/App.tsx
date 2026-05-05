@@ -31,6 +31,7 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [heroImage, setHeroImage] = useState('https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop');
+  const [banners, setBanners] = useState<{ id: string; image: string; title?: string; subtitle?: string; active: boolean }[]>([]);
 
   // Firestore Sync
   useEffect(() => {
@@ -44,6 +45,12 @@ export default function App() {
       setCategories(docs.length > 0 ? docs : initialCategories);
     });
 
+    const unsubBanners = onSnapshot(collection(db, 'banners'), (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const activeBanners = docs.filter(b => b.active);
+      setBanners(activeBanners);
+    });
+
     const unsubConfig = onSnapshot(doc(db, 'config', 'general'), (docSnap) => {
       if (docSnap.exists()) {
         setHeroImage(docSnap.data().heroImage);
@@ -53,6 +60,7 @@ export default function App() {
     return () => {
       unsubProducts();
       unsubCategories();
+      unsubBanners();
       unsubConfig();
     };
   }, []);
@@ -128,6 +136,7 @@ export default function App() {
         <Hero 
           onShopClick={() => handleNavClick('products')} 
           heroImage={heroImage}
+          banners={banners}
         />
         <Categories 
           categories={categories} 
