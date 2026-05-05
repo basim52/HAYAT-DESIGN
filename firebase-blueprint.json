@@ -61,6 +61,18 @@
       "properties": {
         "heroImage": { "type": "string" }
       }
+    },
+    "Testimonial": {
+      "title": "Customer Testimonial",
+      "description": "Reviews and feedback from customers.",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "content": { "type": "string" },
+        "rating": { "type": "number" },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["customerName", "content", "rating", "date"]
     }
   },
   "firestore": {
@@ -83,6 +95,10 @@
     "/config/general": {
       "schema": "AppConfig",
       "description": "Global settings."
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": "Testimonial",
+      "description": "Customer reviews."
     }
   }
 }

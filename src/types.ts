@@ -42,3 +42,11 @@ export interface Order {
   hasReceipt?: boolean;
   createdAt: string;
 }
+
+export interface Testimonial {
+  id: string;
+  customerName: string;
+  content: string;
+  rating: number;
+  date: string;
+}

@@ -9,6 +9,7 @@ interface CartDrawerProps {
   onUpdateQuantity: (id: string, delta: number) => void;
   onRemove: (id: string) => void;
   onCheckout: () => void;
+  onContinueShopping: () => void;
 }
 
 export default function CartDrawer({
@@ -17,7 +18,8 @@ export default function CartDrawer({
   items,
   onUpdateQuantity,
   onRemove,
-  onCheckout
+  onCheckout,
+  onContinueShopping
 }: CartDrawerProps) {
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -27,7 +29,16 @@ export default function CartDrawer({
         <>
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ 
+              opacity: [1, 0.95, 1]
+            }}
+            transition={{
+              opacity: {
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }
+            }}
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]"
@@ -58,7 +69,13 @@ export default function CartDrawer({
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-300">
                   <ShoppingBag className="w-12 h-12 mb-4" />
-                  <p className="text-sm font-bold uppercase tracking-widest">السلة فارغة</p>
+                  <p className="text-sm font-bold uppercase tracking-widest mb-8">السلة فارغة</p>
+                  <button
+                    onClick={onContinueShopping}
+                    className="px-8 py-3 bg-brand-purple text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-brand-purple/20 hover:scale-105 transition-all active:scale-95"
+                  >
+                    متابعة التسوق
+                  </button>
                 </div>
               ) : (
                 items.map((item) => (
@@ -128,9 +145,15 @@ export default function CartDrawer({
                 </div>
                 <button
                   onClick={onCheckout}
-                  className="w-full py-5 bg-[#2C2C2C] text-white rounded-2xl font-extrabold shadow-lg hover:bg-gold transition-all duration-300 transform active:scale-95"
+                  className="w-full py-5 bg-[#2C2C2C] text-white rounded-2xl font-extrabold shadow-lg hover:bg-gold transition-all duration-300 transform active:scale-95 mb-3"
                 >
                   إتمام الطلب
+                </button>
+                <button
+                  onClick={onContinueShopping}
+                  className="w-full py-4 bg-white text-gray-400 border border-gray-100 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-muted-bg transition-all"
+                >
+                  متابعة التسوق
                 </button>
               </div>
             )}

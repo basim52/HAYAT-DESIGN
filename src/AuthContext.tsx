@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
+import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { UserProfile } from './types';
 
 interface AuthContextType {
@@ -50,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           setLoading(false);
         }, (error) => {
-          console.error("Profile sync error:", error);
+          handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
           setLoading(false);
         });
 

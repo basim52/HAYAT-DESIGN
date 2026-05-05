@@ -6,20 +6,24 @@
 import { useState, useCallback, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import Features from './components/Features';
 import Categories from './components/Categories';
 import ProductList from './components/ProductList';
 import CartDrawer from './components/CartDrawer';
 import CheckoutModal from './components/CheckoutModal';
 import AdminPanel from './components/AdminPanel';
 import Policies from './components/Policies';
+import Testimonials from './components/Testimonials';
 import Footer from './components/Footer';
-import { CartItem, Product, Category } from './types';
-import { PRODUCTS as initialProducts, CATEGORIES as initialCategories } from './constants';
+import { CartItem, Product, Category, Testimonial } from './types';
+import { PRODUCTS as initialProducts, CATEGORIES as initialCategories, BANK_DETAILS } from './constants';
 
 import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { db } from './lib/firebase';
+import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { useAuth } from './AuthContext';
 import LoginModal from './components/LoginModal';
+import { MessageCircle } from 'lucide-react';
 
 export default function App() {
   const { user, profile, isAdmin } = useAuth();
@@ -32,35 +36,42 @@ export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [heroImage, setHeroImage] = useState('https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop');
   const [banners, setBanners] = useState<{ id: string; image: string; title?: string; subtitle?: string; active: boolean }[]>([]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
 
   // Firestore Sync
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
       setProducts(docs.length > 0 ? docs : initialProducts);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'products'));
 
     const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
       setCategories(docs.length > 0 ? docs : initialCategories);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'categories'));
 
     const unsubBanners = onSnapshot(collection(db, 'banners'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       const activeBanners = docs.filter(b => b.active);
       setBanners(activeBanners);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'banners'));
+
+    const unsubTestimonials = onSnapshot(collection(db, 'testimonials'), (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
+      setTestimonials(docs);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'testimonials'));
 
     const unsubConfig = onSnapshot(doc(db, 'config', 'general'), (docSnap) => {
       if (docSnap.exists()) {
         setHeroImage(docSnap.data().heroImage);
       }
-    });
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'config/general'));
 
     return () => {
       unsubProducts();
       unsubCategories();
       unsubBanners();
+      unsubTestimonials();
       unsubConfig();
     };
   }, []);
@@ -118,6 +129,19 @@ export default function App() {
     }
   };
 
+  const scrollToCategory = useCallback((slug: string) => {
+    const id = `category-section-${slug}`;
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 80;
+      const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+      window.scrollTo({
+        top: elementPosition - offset,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
   const handleCheckout = () => {
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
@@ -130,6 +154,8 @@ export default function App() {
         onCartClick={() => setIsCartOpen(true)}
         onNavClick={handleNavClick}
         onLoginClick={() => setIsLoginOpen(true)}
+        categories={categories}
+        onCategoryClick={scrollToCategory}
       />
       
       <main className="pt-20">
@@ -140,18 +166,7 @@ export default function App() {
         />
         <Categories 
           categories={categories} 
-          onCategoryClick={(slug) => {
-            const id = `category-section-${slug}`;
-            const element = document.getElementById(id);
-            if (element) {
-              const offset = 80;
-              const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
-              window.scrollTo({
-                top: elementPosition - offset,
-                behavior: 'smooth'
-              });
-            }
-          }}
+          onCategoryClick={scrollToCategory}
         />
         
         {/* All Products Section with Filters */}
@@ -183,7 +198,10 @@ export default function App() {
           );
         })}
         
+        <Testimonials testimonials={testimonials} />
+        
         <Policies />
+        <Features />
       </main>
 
       <Footer isAdmin={isAdmin} onAdminOpen={() => setIsAdminOpen(true)} />
@@ -195,6 +213,10 @@ export default function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemove={handleRemoveFromCart}
         onCheckout={handleCheckout}
+        onContinueShopping={() => {
+          setIsCartOpen(false);
+          handleNavClick('products');
+        }}
       />
 
       <CheckoutModal 
@@ -216,6 +238,20 @@ export default function App() {
         categories={categories}
         heroImage={heroImage}
       />
+
+      {/* Floating WhatsApp Button */}
+      <a
+        href={`https://wa.me/${BANK_DETAILS.whatsappNumber}`}
+        target="_blank"
+        rel="noreferrer"
+        className="fixed bottom-8 right-8 z-[90] w-16 h-16 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-all duration-300 group"
+        aria-label="Contact on WhatsApp"
+      >
+        <MessageCircle className="w-8 h-8 fill-white/20" />
+        <div className="absolute right-full mr-4 bg-white px-4 py-2 rounded-2xl shadow-xl text-charcoal text-xs font-black whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+          تواصل معنا عبر الواتساب
+        </div>
+      </a>
     </div>
   );
 }

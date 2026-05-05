@@ -1,9 +1,10 @@
-import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout, MessageSquare, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
-import { Product, Category, Order } from '../types';
+import { Product, Category, Order, Testimonial } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { useAuth } from '../AuthContext';
 import ImageEditorModal from './ImageEditorModal';
 import { useTheme } from '../ThemeContext';
@@ -26,7 +27,16 @@ export default function AdminPanel({
   const { isAdmin } = useAuth();
   const { config: themeConfig, previewConfig, setPreview, saveConfig } = useTheme();
   const currentThemeConfig = previewConfig || themeConfig;
-  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders' | 'theme'>('orders');
+  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders' | 'theme' | 'testimonials'>('orders');
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [isAddingTestimonial, setIsAddingTestimonial] = useState(false);
+  const [editingTestimonialId, setEditingTestimonialId] = useState<string | null>(null);
+  const [newTestimonial, setNewTestimonial] = useState<Partial<Testimonial>>({
+    customerName: '',
+    content: '',
+    rating: 5,
+    date: new Date().toISOString().split('T')[0]
+  });
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -70,17 +80,24 @@ export default function AdminPanel({
       const unsubOrders = onSnapshot(qOrders, (snapshot) => {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
         setOrders(docs);
-      });
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'orders'));
 
       const qBanners = query(collection(db, 'banners'));
       const unsubBanners = onSnapshot(qBanners, (snapshot) => {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         setBanners(docs);
-      });
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'banners'));
+
+      const qTestimonials = query(collection(db, 'testimonials'), orderBy('date', 'desc'));
+      const unsubTestimonials = onSnapshot(qTestimonials, (snapshot) => {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
+        setTestimonials(docs);
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'testimonials'));
 
       return () => {
         unsubOrders();
         unsubBanners();
+        unsubTestimonials();
       };
     }
   }, [isOpen, isAdmin]);
@@ -144,7 +161,7 @@ export default function AdminPanel({
       setIsAddingProduct(false);
       setNewProduct({ name: '', category: categories[0]?.name || '', description: '', price: 0, image: '' });
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.WRITE, 'products');
       alert('خطأ أثناء الحفظ في قاعدة البيانات');
     } finally {
       setIsSubmitting(false);
@@ -173,7 +190,7 @@ export default function AdminPanel({
       setIsAddingCategory(false);
       setNewCategory({ name: '', image: '', slug: '' });
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.WRITE, 'categories');
       alert('خطأ أثناء حفظ القسم');
     } finally {
       setIsSubmitting(false);
@@ -199,7 +216,7 @@ export default function AdminPanel({
       setIsAddingBanner(false);
       setNewBanner({ image: '', title: '', subtitle: '', active: true });
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.WRITE, 'banners');
       alert('خطأ أثناء حفظ الغلاف');
     } finally {
       setIsSubmitting(false);
@@ -213,12 +230,11 @@ export default function AdminPanel({
   };
 
   const handleRemoveBanner = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا الغلاف؟')) {
-      try {
-        await deleteDoc(doc(db, 'banners', id));
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      await deleteDoc(doc(db, 'banners', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `banners/${id}`);
+      alert('خطأ أثناء الحذف');
     }
   };
 
@@ -237,7 +253,48 @@ export default function AdminPanel({
       try {
         await deleteDoc(doc(db, 'products', id));
       } catch (err) {
-        console.error(err);
+        handleFirestoreError(err, OperationType.DELETE, `products/${id}`);
+      }
+    }
+  };
+
+  const handleAddTestimonial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSubmitting(true);
+      if (editingTestimonialId) {
+        await updateDoc(doc(db, 'testimonials', editingTestimonialId), newTestimonial);
+        setEditingTestimonialId(null);
+      } else {
+        await addDoc(collection(db, 'testimonials'), newTestimonial);
+      }
+      setIsAddingTestimonial(false);
+      setNewTestimonial({
+        customerName: '',
+        content: '',
+        rating: 5,
+        date: new Date().toISOString().split('T')[0]
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'testimonials');
+      alert('خطأ أثناء حفظ الرأي');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditTestimonial = (testimonial: Testimonial) => {
+    setNewTestimonial(testimonial);
+    setEditingTestimonialId(testimonial.id);
+    setIsAddingTestimonial(true);
+  };
+
+  const handleRemoveTestimonial = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا الرأي؟')) {
+      try {
+        await deleteDoc(doc(db, 'testimonials', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `testimonials/${id}`);
       }
     }
   };
@@ -247,7 +304,7 @@ export default function AdminPanel({
     try {
       await updateDoc(doc(db, 'categories', id), updates);
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.DELETE, `categories/${id}`);
     }
   };
 
@@ -255,7 +312,7 @@ export default function AdminPanel({
     try {
       await updateDoc(doc(db, 'orders', orderId), { status });
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.WRITE, `orders/${orderId}`);
       alert('خطأ أثناء تحديث حالة الطلب');
     }
   };
@@ -265,7 +322,7 @@ export default function AdminPanel({
       try {
         await deleteDoc(doc(db, 'orders', orderId));
       } catch (err) {
-        console.error(err);
+        handleFirestoreError(err, OperationType.DELETE, `orders/${orderId}`);
         alert('خطأ أثناء حذف الطلب');
       }
     }
@@ -352,6 +409,12 @@ export default function AdminPanel({
                     className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'theme' ? 'bg-brand-purple text-white' : 'text-gray-400 hover:text-charcoal'}`}
                   >
                     الثيمات والألوان
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('testimonials')}
+                    className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'testimonials' ? 'bg-brand-purple text-white' : 'text-gray-400 hover:text-charcoal'}`}
+                  >
+                    آراء العملاء
                   </button>
                 </div>
                 <button onClick={onClose} className="p-3 bg-white hover:bg-red-50 hover:text-red-500 rounded-full border border-border-subtle transition-all">
@@ -642,11 +705,11 @@ export default function AdminPanel({
                 )}
 
                 {activeTab === 'hero' && (
-                  <div className="space-y-8">
+                  <div className="space-y-8 pb-20">
                     <div className="flex justify-between items-center">
                       <div className="flex flex-col">
-                        <h3 className="text-xl font-bold">إدارة أغلفة المتجر (Banners)</h3>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">يمكنك إضافة أكثر من غلاف ليظهر في الصفحة الرئيسية</p>
+                        <h3 className="text-xl font-bold">إدارة واجهة المتجر</h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">التحكم في الغلاف الرئيسي والأغلفة المتحركة</p>
                       </div>
                       <button 
                         onClick={() => {
@@ -657,8 +720,88 @@ export default function AdminPanel({
                         className="flex items-center gap-2 bg-brand-purple text-white px-6 py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition-opacity"
                       >
                         <Plus className="w-4 h-4" />
-                        <span>إضافة غلاف جديد</span>
+                        <span>إضافة غلاف بنر جديد</span>
                       </button>
+                    </div>
+
+                    {/* Main Hero Section */}
+                    <div className="bg-white p-8 rounded-[40px] border border-border-subtle shadow-sm">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center text-gold">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-base">الغلاف الأساسي الافتراضي</h4>
+                            <p className="text-[10px] text-gray-400 font-bold">يظهر هذا الغلاف في حال عدم وجود أغلفة متحركة (Banners)</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-8 items-center">
+                        <div className="relative aspect-video rounded-3xl overflow-hidden border border-border-subtle group">
+                          <img src={heroImage} className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => handleUrlImageEdit(heroImage, async (img) => {
+                              try {
+                                await setDoc(doc(db, 'config', 'general'), { heroImage: img }, { merge: true });
+                              } catch (err) {
+                                console.error(err);
+                                alert('خطأ في تحديث الغلاف');
+                              }
+                            }, 16/9)}
+                            className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-xs font-bold"
+                          >
+                            <Scissors className="w-4 h-4" />
+                            تعديل الموضع
+                          </button>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">تغيير صورة الغلاف الأساسي</label>
+                            <div className="flex gap-2">
+                              <input 
+                                type="text" 
+                                placeholder="رابط الصورة" 
+                                className="flex-1 p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
+                                value={heroImage}
+                                onChange={async (e) => {
+                                  try {
+                                    await setDoc(doc(db, 'config', 'general'), { heroImage: e.target.value }, { merge: true });
+                                  } catch (err) {
+                                      console.error(err);
+                                  }
+                                }}
+                              />
+                              <label className="p-4 bg-white border border-border-subtle rounded-2xl cursor-pointer hover:bg-muted-bg transition-colors">
+                                <ImageIcon className="w-5 h-5 text-brand-purple" />
+                                <input 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*" 
+                                  onChange={(e) => handleFileUpload(e, async (img) => {
+                                    try {
+                                      await setDoc(doc(db, 'config', 'general'), { heroImage: img }, { merge: true });
+                                    } catch (err) {
+                                        console.error(err);
+                                    }
+                                  }, 16/9)}
+                                />
+                              </label>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-gray-400 leading-relaxed font-bold">
+                            نصيحة: استخدم صوراً عالية الجودة بنسبة عرض 16:9 للحصول على أفضل النتائج في واجهة المتجر.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 py-4">
+                      <div className="flex-1 h-px bg-border-subtle" />
+                      <span className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] whitespace-nowrap">الأغلفة المتحركة (Banners)</span>
+                      <div className="flex-1 h-px bg-border-subtle" />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -759,24 +902,42 @@ export default function AdminPanel({
 
                       {banners.map((b) => (
                         <div key={b.id} className="bg-white rounded-[40px] border border-border-subtle overflow-hidden flex flex-col group relative">
-                          <div className="aspect-square relative overflow-hidden">
+                          <div className="aspect-video relative overflow-hidden">
                             <img src={b.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                            <button 
-                              onClick={() => {
-                                handleUrlImageEdit(b.image, async (cropped) => {
-                                  try {
-                                    await updateDoc(doc(db, 'banners', b.id), { image: cropped });
-                                  } catch (err) {
-                                    console.error(err);
-                                    alert('خطأ أثناء تحديث صورة الغلاف');
-                                  }
-                                }, 1);
-                              }}
-                              className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 text-xs font-bold"
-                            >
-                              <Scissors className="w-5 h-5" />
-                              تعديل الموضع مباشرة
-                            </button>
+                            <div className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
+                              <div className="flex gap-2">
+                                <button 
+                                  onClick={() => {
+                                    handleUrlImageEdit(b.image, async (cropped) => {
+                                      try {
+                                        await updateDoc(doc(db, 'banners', b.id), { image: cropped });
+                                      } catch (err) {
+                                        console.error(err);
+                                        alert('خطأ أثناء تحديث صورة الغلاف');
+                                      }
+                                    }, 16/9);
+                                  }}
+                                  className="p-4 bg-white/20 hover:bg-white/40 rounded-2xl backdrop-blur-md border border-white/20 transition-all flex flex-col items-center gap-1 min-w-[100px]"
+                                >
+                                  <Scissors className="w-5 h-5" />
+                                  <span className="text-[10px] font-bold">تعديل الموضع</span>
+                                </button>
+                                <button 
+                                  onClick={() => handleRemoveBanner(b.id)}
+                                  className="p-4 bg-red-500/20 hover:bg-red-500/40 rounded-2xl backdrop-blur-md border border-red-500/30 transition-all flex flex-col items-center gap-1 min-w-[100px] text-red-100"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                  <span className="text-[10px] font-bold">حذف الغلاف</span>
+                                </button>
+                                <button 
+                                  onClick={() => handleEditBanner(b)}
+                                  className="p-4 bg-white/20 hover:bg-white/40 rounded-2xl backdrop-blur-md border border-white/20 transition-all flex flex-col items-center gap-1 min-w-[100px]"
+                                >
+                                  <Edit2 className="w-5 h-5" />
+                                  <span className="text-[10px] font-bold">تعديل البيانات</span>
+                                </button>
+                              </div>
+                            </div>
                             {!b.active && (
                               <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
                                 <span className="px-4 py-2 bg-white/20 text-white rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/30">معطل</span>
@@ -1151,6 +1312,140 @@ export default function AdminPanel({
                           </motion.div>
                         ))
                       )}
+                    </div>
+                  </div>
+                )}
+                {activeTab === 'testimonials' && (
+                  <div className="space-y-8">
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <h3 className="text-xl font-bold">إدارة آراء العملاء</h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">عرض وتنسيق آراء العملاء في الموقع</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setEditingTestimonialId(null);
+                          setNewTestimonial({
+                            customerName: '',
+                            content: '',
+                            rating: 5,
+                            date: new Date().toISOString().split('T')[0]
+                          });
+                          setIsAddingTestimonial(true);
+                        }}
+                        className="flex items-center gap-2 bg-brand-purple text-white px-6 py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition-opacity"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>إضافة رأي جديد</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+                      <AnimatePresence>
+                        {isAddingTestimonial && (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white p-8 rounded-[40px] border-2 border-dashed border-brand-purple/30 shadow-xl z-20 col-span-full"
+                          >
+                            <form onSubmit={handleAddTestimonial} className="grid md:grid-cols-2 gap-6">
+                              <div className="space-y-4">
+                                <h4 className="font-bold text-sm text-brand-purple">
+                                  {editingTestimonialId ? 'تعديل الرأي' : 'إضافة رأي جديد'}
+                                </h4>
+                                <input 
+                                  required
+                                  type="text" 
+                                  placeholder="اسم العميل" 
+                                  className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
+                                  value={newTestimonial.customerName}
+                                  onChange={e => setNewTestimonial({...newTestimonial, customerName: e.target.value})}
+                                />
+                                <textarea 
+                                  required
+                                  placeholder="محتوى الرأي..." 
+                                  className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple h-32 resize-none"
+                                  value={newTestimonial.content}
+                                  onChange={e => setNewTestimonial({...newTestimonial, content: e.target.value})}
+                                />
+                              </div>
+                              <div className="space-y-6">
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">التقييم</label>
+                                  <div className="flex gap-2 p-2 bg-muted-bg rounded-2xl justify-center">
+                                    {[1, 2, 3, 4, 5].map((s) => (
+                                      <button 
+                                        key={s}
+                                        type="button"
+                                        onClick={() => setNewTestimonial({...newTestimonial, rating: s})}
+                                        className={`p-2 transition-all ${newTestimonial.rating! >= s ? 'text-gold' : 'text-gray-300'}`}
+                                      >
+                                        <Star className={`w-8 h-8 ${newTestimonial.rating! >= s ? 'fill-gold' : ''}`} />
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">تاريخ الرأي</label>
+                                  <input 
+                                    required
+                                    type="date" 
+                                    className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-purple"
+                                    value={newTestimonial.date}
+                                    onChange={e => setNewTestimonial({...newTestimonial, date: e.target.value})}
+                                  />
+                                </div>
+                                <div className="flex gap-2 pt-4">
+                                  <button type="submit" disabled={isSubmitting} className="flex-1 bg-brand-purple text-white py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2">
+                                    {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                    {editingTestimonialId ? 'تحديث' : 'حفظ الرأي'}
+                                  </button>
+                                  <button type="button" onClick={() => setIsAddingTestimonial(false)} className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-bold text-sm">إلغاء</button>
+                                </div>
+                              </div>
+                            </form>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {testimonials.map((t) => (
+                        <div key={t.id} className="bg-white p-6 rounded-[32px] border border-border-subtle hover:shadow-lg transition-all group flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-start mb-4">
+                              <div className="flex gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star key={i} className={`w-3 h-3 ${i < t.rating ? 'fill-gold text-gold' : 'text-gray-200'}`} />
+                                ))}
+                              </div>
+                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => handleEditTestimonial(t)}
+                                  className="p-2 bg-muted-bg text-gray-400 hover:text-brand-purple rounded-xl transition-all"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleRemoveTestimonial(t.id)}
+                                  className="p-2 bg-red-50 text-red-200 hover:text-red-500 rounded-xl transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-charcoal/80 italic mb-6 leading-relaxed">"{t.content}"</p>
+                          </div>
+                          <div className="flex items-center gap-3 pt-4 border-t border-dashed border-border-subtle">
+                            <div className="w-8 h-8 rounded-full bg-brand-purple/10 text-brand-purple flex items-center justify-center font-black text-[10px]">
+                              {t.customerName.charAt(0)}
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-xs">{t.customerName}</h4>
+                              <span className="text-[9px] text-gray-400 font-bold">{t.date}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

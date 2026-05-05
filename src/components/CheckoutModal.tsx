@@ -5,6 +5,7 @@ import { BANK_DETAILS, PAYMENT_METHODS } from '../constants';
 import { CartItem, UserProfile } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import ImageEditorModal from './ImageEditorModal';
 
 interface CheckoutModalProps {
@@ -123,7 +124,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
       
       setShowSuccess(true);
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.WRITE, 'orders');
       alert('حدث خطأ أثناء تسجيل الطلب، يرجى المحاولة مرة أخرى');
     } finally {
       setIsSubmitting(false);

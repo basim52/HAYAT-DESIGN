@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from './lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 
 type ThemeType = 'original' | 'classic' | 'modern' | 'creative';
 
@@ -36,7 +37,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (docSnap.exists()) {
         setConfig(docSnap.data() as ThemeConfig);
       }
-    });
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'config/theme'));
     return unsub;
   }, []);
 

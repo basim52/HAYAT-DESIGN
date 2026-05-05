@@ -1,23 +1,28 @@
-import { ShoppingBag, Menu, X, User as UserIcon } from 'lucide-react';
+import { ShoppingBag, Menu, X, User as UserIcon, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
+import { Category } from '../types';
 
 interface NavbarProps {
   cartCount: number;
   onCartClick: () => void;
   onNavClick: (sectionId: string) => void;
   onLoginClick: () => void;
+  categories: Category[];
+  onCategoryClick: (slug: string) => void;
 }
 
-export default function Navbar({ cartCount, onCartClick, onNavClick, onLoginClick }: NavbarProps) {
+export default function Navbar({ cartCount, onCartClick, onNavClick, onLoginClick, categories, onCategoryClick }: NavbarProps) {
   const { user, profile } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const navLinks = [
     { name: 'الرئيسية', id: 'home' },
     { name: 'أقسامنا', id: 'categories' },
     { name: 'منتجاتنا', id: 'products' },
+    { name: 'آراء العملاء', id: 'testimonials' },
     { name: 'سياسات المتجر', id: 'policies' },
     { name: 'تواصل معنا', id: 'contact' },
   ];
@@ -40,6 +45,64 @@ export default function Navbar({ cartCount, onCartClick, onNavClick, onLoginClic
             </span>
             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.3em] mr-0.5 group-hover:text-brand-teal transition-colors">HAYAT DESIGN</span>
           </div>
+        </div>
+
+        {/* Categories Dropdown */}
+        <div 
+          className="relative hidden lg:block"
+          onMouseEnter={() => setIsDropdownOpen(true)}
+          onMouseLeave={() => setIsDropdownOpen(false)}
+        >
+          <button 
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand-purple/5 text-brand-purple rounded-2xl hover:bg-brand-purple hover:text-white transition-all duration-300 font-black text-[10px] uppercase tracking-widest"
+          >
+            أقسامنا
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          <AnimatePresence>
+            {isDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="absolute top-full right-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-border-subtle p-3 overflow-hidden"
+              >
+                <div className="space-y-1">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        onCategoryClick(cat.slug);
+                        setIsDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-muted-bg transition-colors text-right group"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-gold/10 text-gold flex items-center justify-center text-xs group-hover:bg-brand-purple group-hover:text-white transition-colors">
+                        {cat.name.charAt(0)}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-charcoal">{cat.name}</span>
+                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mr-0.5">Explore Section</span>
+                      </div>
+                    </button>
+                  ))}
+                  
+                  <div className="pt-2 mt-2 border-t border-border-subtle">
+                    <button
+                      onClick={() => {
+                        onNavClick('categories');
+                        setIsDropdownOpen(false);
+                      }}
+                      className="w-full p-3 rounded-2xl bg-brand-teal/5 text-brand-teal text-[10px] font-black uppercase tracking-widest text-center hover:bg-brand-teal hover:text-white transition-all"
+                    >
+                      عرض جميع الأقسام
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="hidden md:flex items-center gap-8">

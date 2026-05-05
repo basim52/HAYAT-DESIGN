@@ -63,7 +63,8 @@ export default function Footer({ onAdminOpen, isAdmin }: FooterProps) {
             <ul className="space-y-4 text-xs font-bold text-gray-500 uppercase tracking-widest">
               <li><a href="#" className="hover:text-gold transition-colors">الأعمال الخشبية</a></li>
               <li><a href="#" className="hover:text-gold transition-colors">منتجات الأكريليك</a></li>
-              <li><a href="#" className="hover:text-gold transition-colors">حوامل الجوال</a></li>
+              <li><a href="#" className="hover:text-gold transition-colors">تصاميم ورقية بالكاميو</a></li>
+              <li><a href="#" className="hover:text-gold transition-colors">تصاميم حسب الطلب</a></li>
             </ul>
           </div>
 
