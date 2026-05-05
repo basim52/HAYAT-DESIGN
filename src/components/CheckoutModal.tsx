@@ -1,10 +1,11 @@
-import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon } from 'lucide-react';
+import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon, Scissors } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, FormEvent, useEffect, ChangeEvent } from 'react';
 import { BANK_DETAILS, PAYMENT_METHODS } from '../constants';
 import { CartItem, UserProfile } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import ImageEditorModal from './ImageEditorModal';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   const [orderUrls, setOrderUrls] = useState<{ whatsappUrl: string; mailtoUrl: string } | null>(null);
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0]);
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [imageToEdit, setImageToEdit] = useState<string | null>(null);
 
   const [preferredMethod, setPreferredMethod] = useState<'whatsapp' | 'email' | null>(null);
 
@@ -44,9 +46,13 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 20 * 1024 * 1024) {
+        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 20 ميجابايت');
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setReceiptImage(reader.result as string);
+        setImageToEdit(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -122,8 +128,9 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
+    <>
+      <AnimatePresence>
+        {isOpen && (
         <>
           <motion.div
             initial={{ opacity: 0 }}
@@ -423,6 +430,16 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+      </AnimatePresence>
+      <ImageEditorModal 
+        isOpen={!!imageToEdit}
+        image={imageToEdit || ''}
+        onClose={() => setImageToEdit(null)}
+        onSave={(cropped) => {
+          setReceiptImage(cropped);
+          setImageToEdit(null);
+        }}
+      />
+    </>
   );
 }

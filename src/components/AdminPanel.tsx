@@ -1,10 +1,11 @@
-import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import { Product, Category, Order } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
+import ImageEditorModal from './ImageEditorModal';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export default function AdminPanel({
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingHero, setEditingHero] = useState(heroImage);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
     name: '',
@@ -44,6 +46,9 @@ export default function AdminPanel({
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  // Image Editor State
+  const [imageToEdit, setImageToEdit] = useState<{ src: string, callback: (cropped: string) => void } | null>(null);
 
   // Fetch orders when admin panel opens and tab is orders
   useEffect(() => {
@@ -74,13 +79,16 @@ export default function AdminPanel({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 2 ميجابايت');
+      if (file.size > 20 * 1024 * 1024) {
+        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 20 ميجابايت');
         return;
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        callback(reader.result as string);
+        setImageToEdit({
+          src: reader.result as string,
+          callback
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -89,6 +97,7 @@ export default function AdminPanel({
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      setIsSubmitting(true);
       if (editingProductId) {
         const productRef = doc(db, 'products', editingProductId);
         await updateDoc(productRef, newProduct);
@@ -101,6 +110,8 @@ export default function AdminPanel({
     } catch (err) {
       console.error(err);
       alert('خطأ أثناء الحفظ في قاعدة البيانات');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -144,10 +155,13 @@ export default function AdminPanel({
 
   const handleUpdateHero = async () => {
     try {
+      setIsSubmitting(true);
       await setDoc(doc(db, 'config', 'general'), { heroImage: editingHero });
       alert('تم تحديث صورة الغلاف بنجاح');
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -201,8 +215,9 @@ export default function AdminPanel({
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
+    <>
+      <AnimatePresence>
+        {isOpen && (
         <>
           <motion.div
             initial={{ opacity: 0 }}
@@ -349,8 +364,11 @@ export default function AdminPanel({
                                 value={newProduct.description}
                                 onChange={e => setNewProduct({...newProduct, description: e.target.value})}
                               />
-                              <div className="flex gap-2">
-                                <button type="submit" className="flex-1 bg-brand-teal text-white py-3 rounded-xl font-bold text-xs">
+                               <div className="flex gap-2">
+                                <button type="submit" disabled={isSubmitting} className="flex-1 bg-brand-teal text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2">
+                                  {isSubmitting ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  ) : null}
                                   {editingProductId ? 'تحديث' : 'حفظ'}
                                 </button>
                                 <button type="button" onClick={() => setIsAddingProduct(false)} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold text-xs">إلغاء</button>
@@ -417,9 +435,14 @@ export default function AdminPanel({
                             </label>
                             <button 
                               onClick={handleUpdateHero}
-                              className="bg-brand-purple text-white px-8 rounded-2xl font-bold text-xs flex items-center gap-2 hover:opacity-90 transition-opacity"
+                              disabled={isSubmitting}
+                              className="bg-brand-purple text-white px-8 rounded-2xl font-bold text-xs flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
                             >
-                              <Save className="w-4 h-4" />
+                              {isSubmitting ? (
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4" />
+                              )}
                               <span>حفظ التعديل</span>
                             </button>
                           </div>
@@ -773,7 +796,18 @@ export default function AdminPanel({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
-
+      </AnimatePresence>
+      <ImageEditorModal 
+        isOpen={!!imageToEdit}
+        image={imageToEdit?.src || ''}
+        onClose={() => setImageToEdit(null)}
+        onSave={(cropped) => {
+          if (imageToEdit) {
+            imageToEdit.callback(cropped);
+            setImageToEdit(null);
+          }
+        }}
+      />
+    </>
   );
 }
