@@ -26,6 +26,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     email: '',
     password: '',
     fullName: '',
+    phone: '',
+    shortAddress: '',
   });
 
   const [formData, setFormData] = useState({
@@ -96,6 +98,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           id: newUser.uid,
           fullName: authFormData.fullName,
           email: authFormData.email,
+          phone: authFormData.phone,
+          shortAddress: authFormData.shortAddress,
           isAdmin: false,
           createdAt: new Date().toISOString()
         });
@@ -185,6 +189,36 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       </div>
                     </div>
                   )}
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">رقم الجوال</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input 
+                        required
+                        type="tel"
+                        placeholder="05xxxxxxx"
+                        className="w-full p-4 pl-12 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right"
+                        value={authFormData.phone}
+                        onChange={e => setAuthFormData({...authFormData, phone: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">العنوان الوطني المختصر <span className="text-red-500">* مطلوب</span></label>
+                    <div className="relative">
+                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input 
+                        required
+                        type="text"
+                        placeholder="مثال: AB1234"
+                        className="w-full p-4 pl-12 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right uppercase font-bold tracking-widest"
+                        value={authFormData.shortAddress}
+                        onChange={e => setAuthFormData({...authFormData, shortAddress: e.target.value.toUpperCase()})}
+                      />
+                    </div>
+                  </div>
                   
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">البريد الإلكتروني</label>
@@ -365,13 +399,14 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">العنوان الوطني المختصر</label>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">العنوان الوطني المختصر <span className="text-red-500">* مطلوب</span></label>
                             <input 
+                                required
                                 type="text"
                                 placeholder="مثال: AB1234"
                                 className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right uppercase font-bold tracking-widest"
                                 value={formData.shortAddress}
-                                onChange={e => setFormData({...formData, shortAddress: e.target.value})}
+                                onChange={e => setFormData({...formData, shortAddress: e.target.value.toUpperCase()})}
                             />
                         </div>
                         <div className="flex gap-3 pt-2">

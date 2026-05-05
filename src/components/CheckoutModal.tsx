@@ -40,7 +40,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0]);
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
-
+  const [useAlternativeInfo, setUseAlternativeInfo] = useState(false);
   const [preferredMethod, setPreferredMethod] = useState<'whatsapp' | 'email' | null>(null);
 
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -251,7 +251,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                         
                         {selectedMethod.accountNumber && (
                           <div>
-                            <p className="text-charcoal/40 mb-1">{selectedMethod.id === 'stc-pay' ? 'رقم الجوال (STC Pay)' : 'رقم الحساب'}</p>
+                            <p className="text-charcoal/40 mb-1">{selectedMethod.id === 'stc-pay' ? 'رقم الجوال (STC Bank)' : 'رقم الحساب'}</p>
                             <div className="flex items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gold/10">
                               <code className="text-xs font-mono font-bold tracking-wider">{selectedMethod.accountNumber}</code>
                               <button 
@@ -297,80 +297,112 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                   <div className="space-y-5">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="font-bold text-sm">بيانات التوصيل والطلب</h3>
-                      {!userProfile && (
-                        <button 
-                          type="button" 
-                          onClick={onClose}
-                          className="text-[10px] font-bold text-brand-purple hover:underline"
-                        >
-                          تعديل البيانات؟
-                        </button>
-                      )}
                     </div>
                     
                     <div className="space-y-4">
-                      {/* Name */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center px-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">الاسم الكامل</label>
-                          <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                      {userProfile && !useAlternativeInfo ? (
+                        <div className="p-5 bg-brand-purple/5 border border-brand-purple/10 rounded-[32px] space-y-4">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-bold text-brand-purple uppercase tracking-widest bg-brand-purple/10 w-fit px-2 py-0.5 rounded-full">بياناتي المسجلة</p>
+                              <div className="space-y-0.5">
+                                <p className="text-sm font-black">{userProfile.fullName}</p>
+                                <p className="text-[11px] text-gray-500 font-bold">{userProfile.phone}</p>
+                                <p className="text-[11px] text-gray-500 leading-relaxed">{userProfile.address || 'لا يوجد عنوان مسجل'}</p>
+                                {userProfile.shortAddress && (
+                                  <p className="text-[10px] text-brand-teal font-black mt-2 inline-block px-2 py-1 bg-brand-teal/10 rounded-lg">العنوان المختصر: {userProfile.shortAddress}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="bg-brand-teal text-white p-1 rounded-full shadow-lg shadow-brand-teal/20">
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={() => setUseAlternativeInfo(true)}
+                            className="w-full py-3 bg-white border border-brand-purple/10 text-brand-purple text-[10px] font-black rounded-2xl hover:bg-brand-purple/5 transition-all shadow-sm"
+                          >
+                            هل ترغب في الشحن لعنوان آخر؟
+                          </button>
                         </div>
-                        <input
-                          required
-                          type="text"
-                          placeholder="أدخل اسمك الثلاثي"
-                          className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm"
-                          value={formData.customerName}
-                          onChange={e => setFormData({ ...formData, customerName: e.target.value })}
-                        />
-                      </div>
+                      ) : (
+                        <>
+                          {userProfile && (
+                            <button 
+                              type="button"
+                              onClick={() => setUseAlternativeInfo(false)}
+                              className="text-[10px] font-black text-brand-teal hover:underline mb-2 block mx-auto py-1 px-3 bg-brand-teal/5 rounded-full"
+                            >
+                              الرجوع لبياناتي المسجلة
+                            </button>
+                          )}
+                          {/* Name */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center px-1">
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">الاسم الكامل</label>
+                              <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                            </div>
+                            <input
+                              required
+                              type="text"
+                              placeholder="أدخل اسمك الثلاثي"
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm"
+                              value={formData.customerName}
+                              onChange={e => setFormData({ ...formData, customerName: e.target.value })}
+                            />
+                          </div>
 
-                      {/* Phone */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center px-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">رقم الجوال</label>
-                          <span className="text-[9px] text-red-500 font-bold">* مطلوب (05xxxxxxx)</span>
-                        </div>
-                        <input
-                          required
-                          type="tel"
-                          pattern="^(05|5|9665)[0-9]{8}$"
-                          placeholder="05xxxxxxx"
-                          className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm text-right"
-                          value={formData.phone}
-                          onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                        />
-                      </div>
+                          {/* Phone */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center px-1">
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">رقم الجوال</label>
+                              <span className="text-[9px] text-red-500 font-bold">* مطلوب (05xxxxxxx)</span>
+                            </div>
+                            <input
+                              required
+                              type="tel"
+                              pattern="^(05|5|9665)[0-9]{8}$"
+                              placeholder="05xxxxxxx"
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm text-right"
+                              value={formData.phone}
+                              onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                            />
+                          </div>
 
-                      {/* Address */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center px-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">عنوان التوصيل / الاستلام</label>
-                          <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
-                        </div>
-                        <textarea
-                          required
-                          placeholder="المدينة، الحي، اسم الشارع، تفاصيل أخرى"
-                          rows={2}
-                          className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all resize-none text-sm"
-                          value={formData.address}
-                          onChange={e => setFormData({ ...formData, address: e.target.value })}
-                        />
-                      </div>
+                          {/* Address */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center px-1">
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">عنوان التوصيل / الاستلام</label>
+                              <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                            </div>
+                            <textarea
+                              required
+                              placeholder="المدينة، الحي، اسم الشارع، تفاصيل أخرى"
+                              rows={2}
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all resize-none text-sm"
+                              value={formData.address}
+                              onChange={e => setFormData({ ...formData, address: e.target.value })}
+                            />
+                          </div>
 
-                      {/* Short Address */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center px-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">العنوان الوطني المختصر</label>
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="مثال: AB1234"
-                          className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm uppercase font-bold tracking-widest"
-                          value={formData.shortAddress}
-                          onChange={e => setFormData({ ...formData, shortAddress: e.target.value })}
-                        />
-                      </div>
+                          {/* Short Address */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center px-1">
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">العنوان الوطني المختصر</label>
+                              <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                            </div>
+                            <input
+                              required
+                              type="text"
+                              placeholder="مثال: AB1234"
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm uppercase font-bold tracking-widest"
+                              value={formData.shortAddress}
+                              onChange={e => setFormData({ ...formData, shortAddress: e.target.value.toUpperCase() })}
+                            />
+                          </div>
+                        </>
+                      )}
 
                       {/* Receipt Upload */}
                       <div className="space-y-1.5">
@@ -415,7 +447,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                     <div className="grid grid-cols-2 gap-3 pt-2">
                       <button
                         type="button"
-                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address || !receiptImage}
+                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address || !formData.shortAddress || !receiptImage}
                         onClick={(e) => handleOrderSubmission(e, 'whatsapp')}
                         className="py-4 bg-green-600 text-white rounded-2xl font-bold text-xs hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
@@ -428,7 +460,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                       </button>
                       <button
                         type="button"
-                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address || !receiptImage}
+                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address || !formData.shortAddress || !receiptImage}
                         onClick={(e) => handleOrderSubmission(e, 'email')}
                         className="py-4 bg-brand-purple text-white rounded-2xl font-bold text-xs hover:bg-brand-purple/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >

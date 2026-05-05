@@ -113,7 +113,7 @@ export const PAYMENT_METHODS = [
   },
   {
     id: 'stc-pay',
-    bankName: 'STC Pay',
+    bankName: 'STC Bank (Pay)',
     accountName: 'حياة عبدالواحد الزاكي',
     accountNumber: '0541356580',
     type: 'digital'
