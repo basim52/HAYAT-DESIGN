@@ -1,4 +1,4 @@
-import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import { Product, Category, Order } from '../types';
@@ -6,6 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
 import ImageEditorModal from './ImageEditorModal';
+import { useTheme } from '../ThemeContext';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -23,7 +24,8 @@ export default function AdminPanel({
   heroImage,
 }: AdminPanelProps) {
   const { isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders'>('products');
+  const { config: themeConfig, updateConfig: updateThemeConfig } = useTheme();
+  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders' | 'theme'>('orders');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -331,6 +333,12 @@ export default function AdminPanel({
                       </span>
                     )}
                   </button>
+                  <button 
+                    onClick={() => setActiveTab('theme')}
+                    className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'theme' ? 'bg-brand-purple text-white' : 'text-gray-400 hover:text-charcoal'}`}
+                  >
+                    الثيمات والألوان
+                  </button>
                 </div>
                 <button onClick={onClose} className="p-3 bg-white hover:bg-red-50 hover:text-red-500 rounded-full border border-border-subtle transition-all">
                   <X className="w-5 h-5" />
@@ -341,6 +349,113 @@ export default function AdminPanel({
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-8 bg-body-bg">
               <div className="max-w-6xl mx-auto">
+                {activeTab === 'theme' && isAdmin && (
+                  <div className="max-w-4xl mx-auto space-y-12 pb-20">
+                    <div className="flex flex-col">
+                      <h3 className="text-2xl font-black text-brand-purple">تخصيص مظهر المتجر</h3>
+                      <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">اختر الثيم المناسب وتحكم في الألوان الأساسية</p>
+                    </div>
+
+                    {/* Theme Selection */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {(['classic', 'modern', 'creative'] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => updateThemeConfig({ activeTheme: t })}
+                          className={`p-6 rounded-[40px] border-2 transition-all text-right relative overflow-hidden group ${
+                            themeConfig.activeTheme === t 
+                              ? 'border-brand-purple bg-white shadow-xl shadow-brand-purple/10' 
+                              : 'border-border-subtle bg-white/50 hover:border-brand-purple/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-4">
+                            <div className={`p-3 rounded-2xl ${themeConfig.activeTheme === t ? 'bg-brand-purple text-white' : 'bg-muted-bg text-gray-400'}`}>
+                              <Layout className="w-5 h-5" />
+                            </div>
+                            {themeConfig.activeTheme === t && (
+                              <div className="bg-brand-teal text-white p-1 rounded-full">
+                                <CheckCircle className="w-4 h-4" />
+                              </div>
+                            )}
+                          </div>
+                          <h4 className="font-black text-lg capitalize">{t === 'classic' ? 'الملكي (Classic)' : t === 'modern' ? 'العصري (Modern)' : 'الإبداعي (Creative)'}</h4>
+                          <p className="text-[10px] text-gray-400 font-bold mt-2 leading-relaxed">
+                            {t === 'classic' ? 'لمسات فخمة وخطوط كلاسيكية تناسب الأعمال الراقية.' : t === 'modern' ? 'تصميم بسيط بخطوط حادة وواضحة يركز على المحتوى.' : 'تصميم ملهم بأشكال دائرية وألوان نابضة بالحياة.'}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Color Management */}
+                    <div className="bg-white p-10 rounded-[50px] border border-border-subtle shadow-sm space-y-8">
+                      <div className="flex items-center gap-3 border-b border-border-subtle pb-6">
+                        <Palette className="w-6 h-6 text-brand-purple" />
+                        <h4 className="font-black text-xl">لوحة الألوان المخصصة</h4>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                        <div className="space-y-4">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">اللون الأساسي (Primary)</label>
+                          <div className="flex items-center gap-4">
+                            <input 
+                              type="color" 
+                              value={themeConfig.primaryColor}
+                              onChange={(e) => updateThemeConfig({ primaryColor: e.target.value })}
+                              className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
+                            />
+                            <input 
+                              type="text"
+                              value={themeConfig.primaryColor}
+                              onChange={(e) => updateThemeConfig({ primaryColor: e.target.value })}
+                              className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">اللون الثانوي (Secondary)</label>
+                          <div className="flex items-center gap-4">
+                            <input 
+                              type="color" 
+                              value={themeConfig.secondaryColor}
+                              onChange={(e) => updateThemeConfig({ secondaryColor: e.target.value })}
+                              className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
+                            />
+                            <input 
+                              type="text"
+                              value={themeConfig.secondaryColor}
+                              onChange={(e) => updateThemeConfig({ secondaryColor: e.target.value })}
+                              className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">لون التمييز (Accent)</label>
+                          <div className="flex items-center gap-4">
+                            <input 
+                              type="color" 
+                              value={themeConfig.accentColor}
+                              onChange={(e) => updateThemeConfig({ accentColor: e.target.value })}
+                              className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
+                            />
+                            <input 
+                              type="text"
+                              value={themeConfig.accentColor}
+                              onChange={(e) => updateThemeConfig({ accentColor: e.target.value })}
+                              className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-6 border-t border-border-subtle flex justify-center">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">التغييرات تظهر لحظياً لجميع الزوار بمجرد الحفظ</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {activeTab === 'products' && (
                   <div className="space-y-8">
                     <div className="flex justify-between items-center">
