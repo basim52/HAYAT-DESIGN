@@ -13,7 +13,9 @@ interface ThemeConfig {
 
 interface ThemeContextType {
   config: ThemeConfig;
-  updateConfig: (newConfig: Partial<ThemeConfig>) => Promise<void>;
+  previewConfig: ThemeConfig | null;
+  setPreview: (newConfig: Partial<ThemeConfig> | null) => void;
+  saveConfig: () => Promise<void>;
 }
 
 const defaultBotConfig: ThemeConfig = {
@@ -27,6 +29,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<ThemeConfig>(defaultBotConfig);
+  const [previewConfig, setPreviewConfig] = useState<ThemeConfig | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'config', 'theme'), (docSnap) => {
@@ -38,23 +41,37 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Determine which config to apply (Preview has priority)
+    const activeConfig = previewConfig || config;
+
     // Apply colors to CSS Variables
     const root = document.documentElement;
-    root.style.setProperty('--brand-purple', config.primaryColor);
-    root.style.setProperty('--brand-teal', config.secondaryColor);
-    root.style.setProperty('--brand-gold', config.accentColor);
+    root.style.setProperty('--brand-purple', activeConfig.primaryColor);
+    root.style.setProperty('--brand-teal', activeConfig.secondaryColor);
+    root.style.setProperty('--brand-gold', activeConfig.accentColor);
     
     // Apply Theme specific classes to body
-    document.body.className = `theme-${config.activeTheme}`;
-  }, [config]);
+    document.body.className = `theme-${activeConfig.activeTheme}`;
+  }, [config, previewConfig]);
 
-  const updateConfig = async (newConfig: Partial<ThemeConfig>) => {
-    const updated = { ...config, ...newConfig };
-    await setDoc(doc(db, 'config', 'theme'), updated);
+  const setPreview = (newConfig: Partial<ThemeConfig> | null) => {
+    if (newConfig === null) {
+      setPreviewConfig(null);
+    } else {
+      setPreviewConfig(prev => ({ ...(prev || config), ...newConfig }));
+    }
+  };
+
+  const saveConfig = async () => {
+    if (previewConfig) {
+      await setDoc(doc(db, 'config', 'theme'), previewConfig);
+      setConfig(previewConfig);
+      setPreviewConfig(null);
+    }
   };
 
   return (
-    <ThemeContext.Provider value={{ config, updateConfig }}>
+    <ThemeContext.Provider value={{ config, previewConfig, setPreview, saveConfig }}>
       {children}
     </ThemeContext.Provider>
   );

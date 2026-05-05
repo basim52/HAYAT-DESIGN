@@ -24,7 +24,8 @@ export default function AdminPanel({
   heroImage,
 }: AdminPanelProps) {
   const { isAdmin } = useAuth();
-  const { config: themeConfig, updateConfig: updateThemeConfig } = useTheme();
+  const { config: themeConfig, previewConfig, setPreview, saveConfig } = useTheme();
+  const currentThemeConfig = previewConfig || themeConfig;
   const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders' | 'theme'>('orders');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -351,6 +352,40 @@ export default function AdminPanel({
               <div className="max-w-6xl mx-auto">
                 {activeTab === 'theme' && isAdmin && (
                   <div className="max-w-4xl mx-auto space-y-12 pb-20">
+                    {/* Save/Cancel Preview Bar */}
+                    <AnimatePresence>
+                      {previewConfig && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 50 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 50 }}
+                          className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-charcoal text-white p-6 rounded-[30px] border border-white/10 shadow-2xl flex items-center gap-8 z-[100] backdrop-blur-xl"
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-brand-teal uppercase tracking-widest">نمط المعاينة نشط</span>
+                            <span className="text-xs font-bold text-gray-300">أنت تشاهد الثيم الآن، هل ترغب في اعتماده؟</span>
+                          </div>
+                          <div className="flex gap-3">
+                            <button 
+                              onClick={() => {
+                                saveConfig();
+                              }}
+                              className="px-6 py-3 bg-brand-purple hover:bg-brand-purple/90 text-white rounded-2xl font-bold text-xs transition-all flex items-center gap-2"
+                            >
+                              <Save className="w-4 h-4" />
+                              <span>حفظ واعتماد</span>
+                            </button>
+                            <button 
+                              onClick={() => setPreview(null)}
+                              className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-bold text-xs transition-all"
+                            >
+                              إلغاء والرجوع للسابق
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
                     <div className="flex flex-col">
                       <h3 className="text-2xl font-black text-brand-purple">تخصيص مظهر المتجر</h3>
                       <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">اختر الثيم المناسب وتحكم في الألوان الأساسية</p>
@@ -361,18 +396,18 @@ export default function AdminPanel({
                       {(['original', 'classic', 'modern', 'creative'] as const).map((t) => (
                         <button
                           key={t}
-                          onClick={() => updateThemeConfig({ activeTheme: t })}
+                          onClick={() => setPreview({ activeTheme: t })}
                           className={`p-6 rounded-[40px] border-2 transition-all text-right relative overflow-hidden group ${
-                            themeConfig.activeTheme === t 
+                            currentThemeConfig.activeTheme === t 
                               ? 'border-brand-purple bg-white shadow-xl shadow-brand-purple/10' 
                               : 'border-border-subtle bg-white/50 hover:border-brand-purple/30'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-4">
-                            <div className={`p-3 rounded-2xl ${themeConfig.activeTheme === t ? 'bg-brand-purple text-white' : 'bg-muted-bg text-gray-400'}`}>
+                            <div className={`p-3 rounded-2xl ${currentThemeConfig.activeTheme === t ? 'bg-brand-purple text-white' : 'bg-muted-bg text-gray-400'}`}>
                               <Layout className="w-5 h-5" />
                             </div>
-                            {themeConfig.activeTheme === t && (
+                            {currentThemeConfig.activeTheme === t && (
                               <div className="bg-brand-teal text-white p-1 rounded-full">
                                 <CheckCircle className="w-4 h-4" />
                               </div>
@@ -401,14 +436,14 @@ export default function AdminPanel({
                           <div className="flex items-center gap-4">
                             <input 
                               type="color" 
-                              value={themeConfig.primaryColor}
-                              onChange={(e) => updateThemeConfig({ primaryColor: e.target.value })}
+                              value={currentThemeConfig.primaryColor}
+                              onChange={(e) => setPreview({ primaryColor: e.target.value })}
                               className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
                             />
                             <input 
                               type="text"
-                              value={themeConfig.primaryColor}
-                              onChange={(e) => updateThemeConfig({ primaryColor: e.target.value })}
+                              value={currentThemeConfig.primaryColor}
+                              onChange={(e) => setPreview({ primaryColor: e.target.value })}
                               className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
                             />
                           </div>
@@ -419,14 +454,14 @@ export default function AdminPanel({
                           <div className="flex items-center gap-4">
                             <input 
                               type="color" 
-                              value={themeConfig.secondaryColor}
-                              onChange={(e) => updateThemeConfig({ secondaryColor: e.target.value })}
+                              value={currentThemeConfig.secondaryColor}
+                              onChange={(e) => setPreview({ secondaryColor: e.target.value })}
                               className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
                             />
                             <input 
                               type="text"
-                              value={themeConfig.secondaryColor}
-                              onChange={(e) => updateThemeConfig({ secondaryColor: e.target.value })}
+                              value={currentThemeConfig.secondaryColor}
+                              onChange={(e) => setPreview({ secondaryColor: e.target.value })}
                               className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
                             />
                           </div>
@@ -437,14 +472,14 @@ export default function AdminPanel({
                           <div className="flex items-center gap-4">
                             <input 
                               type="color" 
-                              value={themeConfig.accentColor}
-                              onChange={(e) => updateThemeConfig({ accentColor: e.target.value })}
+                              value={currentThemeConfig.accentColor}
+                              onChange={(e) => setPreview({ accentColor: e.target.value })}
                               className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
                             />
                             <input 
                               type="text"
-                              value={themeConfig.accentColor}
-                              onChange={(e) => updateThemeConfig({ accentColor: e.target.value })}
+                              value={currentThemeConfig.accentColor}
+                              onChange={(e) => setPreview({ accentColor: e.target.value })}
                               className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
                             />
                           </div>
