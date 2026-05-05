@@ -357,8 +357,8 @@ export default function AdminPanel({
                     </div>
 
                     {/* Theme Selection */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {(['classic', 'modern', 'creative'] as const).map((t) => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {(['original', 'classic', 'modern', 'creative'] as const).map((t) => (
                         <button
                           key={t}
                           onClick={() => updateThemeConfig({ activeTheme: t })}
@@ -378,9 +378,11 @@ export default function AdminPanel({
                               </div>
                             )}
                           </div>
-                          <h4 className="font-black text-lg capitalize">{t === 'classic' ? 'الملكي (Classic)' : t === 'modern' ? 'العصري (Modern)' : 'الإبداعي (Creative)'}</h4>
+                          <h4 className="font-black text-sm capitalize">
+                            {t === 'original' ? 'التصميم الأصلي (Basic)' : t === 'classic' ? 'الملكي (Classic)' : t === 'modern' ? 'العصري (Modern)' : 'الإبداعي (Creative)'}
+                          </h4>
                           <p className="text-[10px] text-gray-400 font-bold mt-2 leading-relaxed">
-                            {t === 'classic' ? 'لمسات فخمة وخطوط كلاسيكية تناسب الأعمال الراقية.' : t === 'modern' ? 'تصميم بسيط بخطوط حادة وواضحة يركز على المحتوى.' : 'تصميم ملهم بأشكال دائرية وألوان نابضة بالحياة.'}
+                            {t === 'original' ? 'التصميم المعتمد والأساسي للمتجر بكل تفاصيله.' : t === 'classic' ? 'لمسات فخمة وخطوط كلاسيكية تناسب الأعمال الراقية.' : t === 'modern' ? 'تصميم بسيط بخطوط حادة وواضحة يركز على المحتوى.' : 'تصميم ملهم بأشكال دائرية وألوان نابضة بالحياة.'}
                           </p>
                         </button>
                       ))}

@@ -22,6 +22,11 @@
   --brand-gold: #D4AF37;
 }
 
+/* Theme Original: The default basic design */
+body.theme-original {
+  --font-sans: "Alexandria", sans-serif;
+}
+
 /* Theme Classic: Royal & Serious */
 body.theme-classic {
   --font-sans: "Alexandria", serif;

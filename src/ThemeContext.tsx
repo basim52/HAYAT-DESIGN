@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from './lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
-type ThemeType = 'classic' | 'modern' | 'creative';
+type ThemeType = 'original' | 'classic' | 'modern' | 'creative';
 
 interface ThemeConfig {
   activeTheme: ThemeType;
@@ -17,10 +17,10 @@ interface ThemeContextType {
 }
 
 const defaultBotConfig: ThemeConfig = {
-  activeTheme: 'classic',
-  primaryColor: '#7C3AED', // purple
-  secondaryColor: '#008077', // teal
-  accentColor: '#D4AF37', // gold
+  activeTheme: 'original',
+  primaryColor: '#7E308E', // original purple
+  secondaryColor: '#00A99D', // original teal
+  accentColor: '#D4AF37', // original gold
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
