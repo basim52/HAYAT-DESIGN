@@ -61,7 +61,7 @@ export default function AdminPanel({
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   // Image Editor State
-  const [imageToEdit, setImageToEdit] = useState<{ src: string, callback: (cropped: string) => void } | null>(null);
+  const [imageToEdit, setImageToEdit] = useState<{ src: string, callback: (cropped: string) => void, aspect?: number } | null>(null);
 
   // Fetch orders and banners
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function AdminPanel({
     );
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void, aspect?: number) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 20 * 1024 * 1024) {
@@ -110,11 +110,24 @@ export default function AdminPanel({
       reader.onloadend = () => {
         setImageToEdit({
           src: reader.result as string,
-          callback
+          callback,
+          aspect
         });
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleUrlImageEdit = (url: string, callback: (cropped: string) => void, aspect?: number) => {
+    if (!url) {
+      alert('يرجى إدخال رابط الصورة أولاً');
+      return;
+    }
+    setImageToEdit({
+      src: url,
+      callback,
+      aspect
+    });
   };
 
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -562,12 +575,21 @@ export default function AdminPanel({
                                       type="file" 
                                       className="hidden" 
                                       accept="image/*" 
-                                      onChange={(e) => handleFileUpload(e, (img) => setNewProduct({...newProduct, image: img}))}
+                                      onChange={(e) => handleFileUpload(e, (img) => setNewProduct({...newProduct, image: img}), 1)}
                                     />
                                   </label>
                                 </div>
                                 {newProduct.image && (
-                                  <img src={newProduct.image} className="w-12 h-12 rounded-lg object-cover border border-border-subtle" />
+                                  <div className="flex items-center gap-2">
+                                    <img src={newProduct.image} className="w-12 h-12 rounded-lg object-cover border border-border-subtle" />
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleUrlImageEdit(newProduct.image!, (img) => setNewProduct({...newProduct, image: img}), 1)}
+                                      className="text-[10px] font-bold text-brand-teal hover:underline"
+                                    >
+                                      تعديل الموضع
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                               <textarea 
@@ -670,13 +692,21 @@ export default function AdminPanel({
                                       type="file" 
                                       className="hidden" 
                                       accept="image/*" 
-                                      onChange={(e) => handleFileUpload(e, (img) => setNewBanner({...newBanner, image: img}))}
+                                      onChange={(e) => handleFileUpload(e, (img) => setNewBanner({...newBanner, image: img}), 1)}
                                     />
                                   </label>
                                 </div>
                                 {newBanner.image && (
-                                  <div className="relative aspect-video rounded-2xl overflow-hidden border border-border-subtle">
+                                  <div className="relative aspect-video rounded-2xl overflow-hidden border border-border-subtle group">
                                     <img src={newBanner.image} className="w-full h-full object-cover" />
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleUrlImageEdit(newBanner.image, (img) => setNewBanner({...newBanner, image: img}), 1)}
+                                      className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-xs font-bold"
+                                    >
+                                      <Scissors className="w-4 h-4" />
+                                      تعديل موضع الغلاف
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -729,8 +759,24 @@ export default function AdminPanel({
 
                       {banners.map((b) => (
                         <div key={b.id} className="bg-white rounded-[40px] border border-border-subtle overflow-hidden flex flex-col group relative">
-                          <div className="aspect-[16/9] relative overflow-hidden">
+                          <div className="aspect-square relative overflow-hidden">
                             <img src={b.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                            <button 
+                              onClick={() => {
+                                handleUrlImageEdit(b.image, async (cropped) => {
+                                  try {
+                                    await updateDoc(doc(db, 'banners', b.id), { image: cropped });
+                                  } catch (err) {
+                                    console.error(err);
+                                    alert('خطأ أثناء تحديث صورة الغلاف');
+                                  }
+                                }, 1);
+                              }}
+                              className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 text-xs font-bold"
+                            >
+                              <Scissors className="w-5 h-5" />
+                              تعديل الموضع مباشرة
+                            </button>
                             {!b.active && (
                               <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
                                 <span className="px-4 py-2 bg-white/20 text-white rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/30">معطل</span>
@@ -814,12 +860,21 @@ export default function AdminPanel({
                                       type="file" 
                                       className="hidden" 
                                       accept="image/*" 
-                                      onChange={(e) => handleFileUpload(e, (img) => setNewCategory({...newCategory, image: img}))}
+                                      onChange={(e) => handleFileUpload(e, (img) => setNewCategory({...newCategory, image: img}), 1)}
                                     />
                                   </label>
                                 </div>
                                 {newCategory.image && (
-                                  <img src={newCategory.image} className="w-20 h-20 rounded-2xl object-cover border border-border-subtle" />
+                                  <div className="flex items-center gap-2">
+                                    <img src={newCategory.image} className="w-20 h-20 rounded-2xl object-cover border border-border-subtle" />
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleUrlImageEdit(newCategory.image!, (img) => setNewCategory({...newCategory, image: img}), 1)}
+                                      className="text-[10px] font-bold text-brand-teal hover:underline"
+                                    >
+                                      تعديل الموضع
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                               <div className="flex gap-2">
@@ -1108,6 +1163,7 @@ export default function AdminPanel({
       <ImageEditorModal 
         isOpen={!!imageToEdit}
         image={imageToEdit?.src || ''}
+        aspect={imageToEdit?.aspect}
         onClose={() => setImageToEdit(null)}
         onSave={(cropped) => {
           if (imageToEdit) {

@@ -10,9 +10,10 @@ interface ImageEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (croppedImage: string) => void;
+  aspect?: number;
 }
 
-export default function ImageEditorModal({ image, isOpen, onClose, onSave }: ImageEditorModalProps) {
+export default function ImageEditorModal({ image, isOpen, onClose, onSave, aspect = 1 }: ImageEditorModalProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -78,7 +79,7 @@ export default function ImageEditorModal({ image, isOpen, onClose, onSave }: Ima
                 crop={crop}
                 zoom={zoom}
                 rotation={rotation}
-                aspect={1} // You can change this to 16/9 or whatever is needed
+                aspect={aspect}
                 onCropChange={setCrop}
                 onRotationChange={setRotation}
                 onCropComplete={onCropComplete}
