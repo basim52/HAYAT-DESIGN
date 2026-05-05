@@ -76,7 +76,11 @@ export default function CartDrawer({
                       <div className="flex justify-between items-start mb-1">
                         <h3 className="font-extrabold text-[13px] text-[#2C2C2C] leading-tight">{item.name}</h3>
                         <button 
-                          onClick={() => onRemove(item.id)}
+                          onClick={() => {
+                            if (confirm('هل أنت متأكد من حذف هذا المنتج من السلة؟')) {
+                              onRemove(item.id);
+                            }
+                          }}
                           className="text-gray-300 hover:text-red-500 transition-colors"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -84,7 +88,18 @@ export default function CartDrawer({
                       </div>
                       <div className="flex items-center justify-between mt-3">
                         <div className="flex items-center gap-3 bg-white rounded-lg px-2 py-1 border border-border-subtle">
-                          <button onClick={() => onUpdateQuantity(item.id, -1)} className="p-1 hover:bg-muted-bg rounded">
+                          <button 
+                            onClick={() => {
+                              if (item.quantity === 1) {
+                                if (confirm('هل أنت متأكد من حذف هذا المنتج من السلة؟')) {
+                                  onUpdateQuantity(item.id, -1);
+                                }
+                              } else {
+                                onUpdateQuantity(item.id, -1);
+                              }
+                            }} 
+                            className="p-1 hover:bg-muted-bg rounded"
+                          >
                             <Minus className="w-3 h-3" />
                           </button>
                           <span className="text-[11px] font-extrabold w-4 text-center">{item.quantity}</span>

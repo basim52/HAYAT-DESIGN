@@ -24,6 +24,7 @@ export interface UserProfile {
   email: string;
   phone?: string;
   address?: string;
+  shortAddress?: string;
   isAdmin?: boolean;
 }
 
@@ -33,8 +34,11 @@ export interface Order {
   customerName: string;
   phone: string;
   address: string;
+  shortAddress?: string;
   items: CartItem[];
   total: number;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  paymentMethod?: string;
+  hasReceipt?: boolean;
   createdAt: string;
 }

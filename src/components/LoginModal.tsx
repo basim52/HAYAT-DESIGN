@@ -1,9 +1,10 @@
-import { X, LogIn, Mail, Phone, MapPin, User as UserIcon, Package, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { X, LogIn, Mail, Phone, MapPin, User as UserIcon, Package, ChevronDown, ChevronUp, Clock, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import { signInWithGoogle, auth, db } from '../lib/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useAuth } from '../AuthContext';
-import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, orderBy, onSnapshot, setDoc } from 'firebase/firestore';
 import { Order } from '../types';
 
 interface LoginModalProps {
@@ -16,12 +17,22 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [showPassword, setShowPassword] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  
+  const [authFormData, setAuthFormData] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+  });
+
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
     address: '',
+    shortAddress: '',
   });
 
   // Sync state when profile loads or editing starts
@@ -31,6 +42,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         fullName: profile.fullName || '',
         phone: profile.phone || '',
         address: profile.address || '',
+        shortAddress: profile.shortAddress || '',
       });
     }
   }, [profile, isEditing]);
@@ -70,6 +82,39 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   };
 
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      if (authMode === 'register') {
+        const { user: newUser } = await createUserWithEmailAndPassword(auth, authFormData.email, authFormData.password);
+        await updateProfile(newUser, { displayName: authFormData.fullName });
+        
+        // Profile creation is handled by AuthProvider's onAuthStateChanged
+        // but we can pre-populate fullName if we want
+        await setDoc(doc(db, 'users', newUser.uid), {
+          id: newUser.uid,
+          fullName: authFormData.fullName,
+          email: authFormData.email,
+          isAdmin: false,
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        await signInWithEmailAndPassword(auth, authFormData.email, authFormData.password);
+      }
+      onClose();
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      let msg = "حدث خطأ أثناء تسجيل الدخول";
+      if (error.code === 'auth/email-already-in-use') msg = "هذا البريد الإلكتروني مستخدم بالفعل";
+      if (error.code === 'auth/wrong-password') msg = "كلمة المرور خاطئة";
+      if (error.code === 'auth/user-not-found') msg = "لا يوجد حساب بهذا البريد";
+      alert(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -89,6 +134,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
+      onClose();
     } catch (error) {
       console.error("Login error:", error);
     }
@@ -109,11 +155,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed inset-0 m-auto w-full max-w-md h-fit bg-white z-[310] rounded-[48px] shadow-2xl overflow-hidden p-8"
+            className="fixed inset-0 m-auto w-full max-w-md h-fit max-h-[95vh] overflow-y-auto bg-white z-[310] rounded-[48px] shadow-2xl p-8 custom-scrollbar"
           >
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-center mb-8 sticky top-0 bg-white z-10 py-2">
               <h2 className="text-2xl font-extrabold tracking-tighter">
-                {user ? 'ملفك الشخصي' : 'تسجيل الدخول'}
+                {user ? 'ملفك الشخصي' : (authMode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب جديد')}
               </h2>
               <button onClick={onClose} className="p-3 hover:bg-muted-bg rounded-full transition-colors">
                 <X className="w-5 h-5 text-gray-400" />
@@ -122,17 +168,99 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
             {!user ? (
               <div className="space-y-6">
-                <p className="text-gray-500 text-sm leading-relaxed text-center">
-                  سجل دخولك لتتبع طلباتك وحفظ بياناتك لتسهيل عملية الشراء القادمة
-                </p>
+                <form onSubmit={handleAuth} className="space-y-4">
+                  {authMode === 'register' && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">الاسم الكامل</label>
+                      <div className="relative">
+                        <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input 
+                          required
+                          type="text"
+                          placeholder="أدخل اسمك الكامل"
+                          className="w-full p-4 pl-12 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right"
+                          value={authFormData.fullName}
+                          onChange={e => setAuthFormData({...authFormData, fullName: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">البريد الإلكتروني</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input 
+                        required
+                        type="email"
+                        placeholder="example@mail.com"
+                        className="w-full p-4 pl-12 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-left"
+                        value={authFormData.email}
+                        onChange={e => setAuthFormData({...authFormData, email: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">كلمة المرور</label>
+                    <div className="relative">
+                      <button 
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-purple"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                      <Lock className="absolute left-10 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input 
+                        required
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        className="w-full p-4 pl-16 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-left"
+                        value={authFormData.password}
+                        onChange={e => setAuthFormData({...authFormData, password: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-5 bg-charcoal text-white rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-charcoal/90 transition-all transform active:scale-95 disabled:opacity-50"
+                  >
+                    {isSubmitting ? <Clock className="w-4 h-4 animate-spin" /> : (authMode === 'login' ? <LogIn className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />)}
+                    <span>{authMode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب'}</span>
+                  </button>
+                </form>
+
+                <div className="relative py-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border-subtle"></div>
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold">
+                    <span className="bg-white px-4 text-gray-400">أو عبر</span>
+                  </div>
+                </div>
+
                 <button
                   onClick={handleGoogleSignIn}
                   className="w-full flex items-center justify-center gap-4 py-5 bg-white border border-border-subtle rounded-3xl font-bold hover:bg-muted-bg transition-all transform active:scale-95"
                 >
                   <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-                  <span>متابعة باستخدام جوجل</span>
+                  <span>المتابعة باستخدام جوجل</span>
                 </button>
-                <div className="text-center">
+
+                <p className="text-center text-xs font-bold text-gray-500">
+                  {authMode === 'login' ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}{' '}
+                  <button 
+                    onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                    className="text-brand-purple hover:underline"
+                  >
+                    {authMode === 'login' ? 'سجل الآن' : 'سجل دخولك'}
+                  </button>
+                </p>
+
+                <div className="text-center pt-4">
                   <p className="text-[10px] text-gray-400 uppercase tracking-widest">نظام تسجيل زبائن حياة ديزاين</p>
                 </div>
               </div>
@@ -156,25 +284,38 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 {activeTab === 'profile' ? (
                   <>
                     <div className="flex items-center gap-4 p-4 bg-muted-bg/50 rounded-3xl border border-border-subtle">
-                      <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-sm">
-                        <img src={user.photoURL || `https://ui-avatars.com/api/?name=${profile?.fullName}`} alt="Avatar" className="w-full h-full object-cover" />
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-sm bg-white">
+                        <img src={user.photoURL || `https://ui-avatars.com/api/?name=${profile?.fullName || user.email}&background=7E308E&color=fff`} alt="Avatar" className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-bold text-lg">{profile?.fullName}</h3>
+                        <h3 className="font-bold text-lg">{profile?.fullName || user.displayName || 'مستخدم جديد'}</h3>
                         <p className="text-xs text-gray-400">{user.email}</p>
                       </div>
                     </div>
 
                     {!isEditing ? (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-1 gap-3">
-                          <div className="flex items-center justify-end gap-3 text-sm p-4 bg-white border border-border-subtle rounded-2xl">
-                            <span>{profile?.phone || 'لا يوجد رقم هاتف'}</span>
-                            <Phone className="w-4 h-4 text-brand-teal" />
+                        <div className="grid grid-cols-1 gap-3 text-right">
+                          <div className="flex items-center justify-between gap-3 text-sm p-4 bg-white border border-border-subtle rounded-2xl">
+                            <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">رقم الجوال</span>
+                            <div className="flex items-center gap-3">
+                              <span>{profile?.phone || 'غير مسجل'}</span>
+                              <Phone className="w-4 h-4 text-brand-teal" />
+                            </div>
                           </div>
-                          <div className="flex items-center justify-end gap-3 text-sm p-4 bg-white border border-border-subtle rounded-2xl">
-                            <span>{profile?.address || 'لا يوجد عنوان مسجل'}</span>
-                            <MapPin className="w-4 h-4 text-brand-teal" />
+                          <div className="flex flex-col gap-2 p-4 bg-white border border-border-subtle rounded-2xl">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">العنوان الكامل</span>
+                              <MapPin className="w-4 h-4 text-brand-teal" />
+                            </div>
+                            <span className="text-sm">{profile?.address || 'غير مسجل'}</span>
+                          </div>
+                          <div className="flex flex-col gap-2 p-4 bg-white border border-border-subtle rounded-2xl">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">العنوان الوطني المختصر</span>
+                              <MapPin className="w-4 h-4 text-brand-purple" />
+                            </div>
+                            <span className="text-sm font-bold uppercase tracking-widest">{profile?.shortAddress || 'غير مسجل'}</span>
                           </div>
                         </div>
                         <div className="flex gap-3">
@@ -199,7 +340,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                             <input 
                                 required
                                 type="text"
-                                className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all"
+                                className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right"
                                 value={formData.fullName}
                                 onChange={e => setFormData({...formData, fullName: e.target.value})}
                             />
@@ -221,6 +362,16 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                                 className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right h-24 resize-none"
                                 value={formData.address}
                                 onChange={e => setFormData({...formData, address: e.target.value})}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">العنوان الوطني المختصر</label>
+                            <input 
+                                type="text"
+                                placeholder="مثال: AB1234"
+                                className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right uppercase font-bold tracking-widest"
+                                value={formData.shortAddress}
+                                onChange={e => setFormData({...formData, shortAddress: e.target.value})}
                             />
                         </div>
                         <div className="flex gap-3 pt-2">
@@ -299,8 +450,14 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                                   <div className="pt-3 border-t border-dashed border-gray-200 mt-2">
                                     <div className="flex items-center gap-2 text-[9px] text-gray-400">
                                       <MapPin className="w-3 h-3" />
-                                      <span>{order.address}</span>
+                                      <span className="flex-1">{order.address}</span>
                                     </div>
+                                    {order.shortAddress && (
+                                      <div className="flex items-center gap-2 text-[9px] text-brand-purple mt-1 font-bold">
+                                        <MapPin className="w-3 h-3" />
+                                        <span>العنوان المختصر: {order.shortAddress}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </motion.div>

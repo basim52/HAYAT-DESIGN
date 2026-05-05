@@ -1018,6 +1018,12 @@ export default function AdminPanel({
                                             <span className="text-gray-400">العنوان:</span>
                                             <span className="font-bold leading-relaxed">{order.address}</span>
                                           </div>
+                                          {order.paymentMethod && (
+                                            <div className="flex justify-between items-center text-xs pt-2 border-t border-dashed border-gray-100">
+                                              <span className="text-gray-400">طريقة الدفع:</span>
+                                              <span className="font-bold text-brand-teal">{order.paymentMethod}</span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
 

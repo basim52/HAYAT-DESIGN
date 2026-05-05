@@ -42,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               id: firebaseUser.uid,
               fullName: firebaseUser.displayName || '',
               email: firebaseUser.email || '',
+              shortAddress: '',
               isAdmin: ADMIN_EMAILS.includes(firebaseUser.email || '')
             };
             await setDoc(profileRef, newProfile);

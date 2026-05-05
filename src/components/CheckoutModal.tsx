@@ -19,6 +19,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
     customerName: '',
     phone: '',
     address: '',
+    shortAddress: '',
   });
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
         customerName: userProfile.fullName || '',
         phone: userProfile.phone || '',
         address: userProfile.address || '',
+        shortAddress: userProfile.shortAddress || '',
       });
     }
   }, [userProfile, isOpen]);
@@ -98,8 +100,9 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
         `*بيانات العميل:*\n` +
         `الاسم: ${formData.customerName}\n` +
         `رقم الجوال: ${formData.phone}\n` +
-        `العنوان: ${formData.address}\n\n` +
-        `*تفاصيل الطلب:*\n${itemsList}\n\n` +
+        `العنوان: ${formData.address}\n` +
+        (formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : '') +
+        `\n*تفاصيل الطلب:*\n${itemsList}\n\n` +
         `*طريقة الدفع:* ${selectedMethod.bankName}\n` +
         `*الإجمالي:* ${total} ر.س\n\n` +
         `${receiptImage ? '*تم إرفاق إيصال التحويل بداخل النظام*' : '*سأقوم بإرسال إيصال التحويل الآن*'}`;
@@ -108,7 +111,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
       const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
       
       const subject = `طلب جديد - ${formData.customerName}`;
-      const emailBody = `الاسم: ${formData.customerName}\nالجوال: ${formData.phone}\nالعنوان: ${formData.address}\n\nتفاصيل الطلب:\n${cartItems.map(i => `${i.name} x${i.quantity}`).join('\n')}\n\nالإجمالي: ${total} ر.س`;
+      const emailBody = `الاسم: ${formData.customerName}\nالجوال: ${formData.phone}\nالعنوان: ${formData.address}\n${formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : ''}\nتفاصيل الطلب:\n${cartItems.map(i => `${i.name} x${i.quantity}`).join('\n')}\n\nالإجمالي: ${total} ر.س`;
       const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
 
       setOrderUrls({ whatsappUrl, mailtoUrl });
@@ -237,18 +240,18 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                     <div className="p-6 bg-gold-light/40 rounded-3xl border border-gold/10 relative overflow-hidden">
                       <div className="absolute -top-4 -left-4 w-24 h-24 bg-gold/5 rounded-full" />
                       <div className="flex items-center gap-3 mb-6">
-                        {selectedMethod.type === 'bank' ? <Landmark className="w-6 h-6 text-gold" /> : <Smartphone className="w-6 h-6 text-gold" />}
+                        {selectedMethod.type === 'bank' ? <Landmark className="w-6 h-6 text-gold" /> : <Smartphone className="w-6 h-6 text-brand-teal" />}
                         <h3 className="font-bold">{selectedMethod.bankName}</h3>
                       </div>
                       <div className="space-y-4 text-sm">
                         <div>
-                          <p className="text-charcoal/40 mb-1">اسم الحساب</p>
+                          <p className="text-charcoal/40 mb-1">{selectedMethod.id === 'stc-pay' ? 'الاسم المسجل' : 'اسم الحساب'}</p>
                           <p className="font-bold">{selectedMethod.accountName}</p>
                         </div>
                         
                         {selectedMethod.accountNumber && (
                           <div>
-                            <p className="text-charcoal/40 mb-1">رقم الحساب</p>
+                            <p className="text-charcoal/40 mb-1">{selectedMethod.id === 'stc-pay' ? 'رقم الجوال (STC Pay)' : 'رقم الحساب'}</p>
                             <div className="flex items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gold/10">
                               <code className="text-xs font-mono font-bold tracking-wider">{selectedMethod.accountNumber}</code>
                               <button 
@@ -352,6 +355,20 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                           className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all resize-none text-sm"
                           value={formData.address}
                           onChange={e => setFormData({ ...formData, address: e.target.value })}
+                        />
+                      </div>
+
+                      {/* Short Address */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center px-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">العنوان الوطني المختصر</label>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="مثال: AB1234"
+                          className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm uppercase font-bold tracking-widest"
+                          value={formData.shortAddress}
+                          onChange={e => setFormData({ ...formData, shortAddress: e.target.value })}
                         />
                       </div>
 
