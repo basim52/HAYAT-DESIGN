@@ -1,10 +1,11 @@
-import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout, MessageSquare, Star, Bell, ShoppingCart, Ticket } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout, MessageSquare, Star, Bell, ShoppingCart, Ticket, Smile } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Product, Category, Order, Testimonial, Coupon, Announcement } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { useAuth } from '../AuthContext';
 import ImageEditorModal from './ImageEditorModal';
 import { useTheme } from '../ThemeContext';
@@ -70,11 +71,24 @@ export default function AdminPanel({
   const [announcementFilter, setAnnouncementFilter] = useState<'all' | 'web' | 'mobile'>('all');
   const [isAddingAnnouncement, setIsAddingAnnouncement] = useState(false);
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<'title' | 'message' | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const [newAnnouncement, setNewAnnouncement] = useState<Partial<Announcement>>({
     title: '',
     message: '',
     type: 'popup',
     size: 'md',
+    shape: 'rounded',
     platform: 'both',
     position: 'bottom',
     active: true,
@@ -424,6 +438,7 @@ export default function AdminPanel({
         message: '', 
         type: 'popup', 
         size: 'md',
+        shape: 'rounded',
         platform: 'both',
         position: 'bottom',
         active: true,
@@ -1861,6 +1876,7 @@ export default function AdminPanel({
                                 message: '', 
                                 type: 'popup', 
                                 size: 'md',
+                                shape: 'rounded',
                                 platform: 'both',
                                 position: 'bottom',
                                 active: true 
@@ -1900,16 +1916,36 @@ export default function AdminPanel({
                           >
                             <form onSubmit={handleAddAnnouncement} className="space-y-6">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
+                                <div className="space-y-2 relative">
                                   <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">عنوان الإعلان</label>
-                                  <input 
-                                    required
-                                    type="text"
-                                    value={newAnnouncement.title}
-                                    onChange={e => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
-                                    className="w-full p-4 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal"
-                                    dir="rtl"
-                                  />
+                                  <div className="relative">
+                                    <input 
+                                      required
+                                      type="text"
+                                      value={newAnnouncement.title}
+                                      onChange={e => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                                      className="w-full p-4 pl-12 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal"
+                                      dir="rtl"
+                                    />
+                                    <button 
+                                      type="button"
+                                      onClick={() => setShowEmojiPicker(showEmojiPicker === 'title' ? null : 'title')}
+                                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-teal transition-colors"
+                                    >
+                                      <Smile className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                  {showEmojiPicker === 'title' && (
+                                    <div ref={emojiPickerRef} className="absolute left-0 bottom-full mb-2 z-50">
+                                      <EmojiPicker 
+                                        onEmojiClick={(emojiData) => {
+                                          setNewAnnouncement({ ...newAnnouncement, title: (newAnnouncement.title || '') + emojiData.emoji });
+                                        }}
+                                        theme={EmojiTheme.LIGHT}
+                                        searchPlaceholder="ابحث عن إيموجي..."
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="space-y-2">
                                   <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">نوع الإنشعار</label>
@@ -1935,15 +1971,47 @@ export default function AdminPanel({
                                     <option value="xl">كامل العرض (Full Width)</option>
                                   </select>
                                 </div>
-                                <div className="space-y-2 md:col-span-2">
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">شكل المنبثق</label>
+                                  <select 
+                                    value={newAnnouncement.shape || 'rounded'}
+                                    onChange={e => setNewAnnouncement({ ...newAnnouncement, shape: e.target.value as any })}
+                                    className="w-full p-4 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal appearance-none"
+                                  >
+                                    <option value="rounded">حواف مستديرة (Default)</option>
+                                    <option value="rectangle">مستطيل حاد (Rectangle)</option>
+                                    <option value="circle">دائري (Circle - sm/md only)</option>
+                                  </select>
+                                </div>
+                                <div className="space-y-2 md:col-span-2 relative">
                                   <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">محتوى الرسالة</label>
-                                  <textarea 
-                                    required
-                                    value={newAnnouncement.message}
-                                    onChange={e => setNewAnnouncement({ ...newAnnouncement, message: e.target.value })}
-                                    className="w-full p-4 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal h-24 resize-none"
-                                    dir="rtl"
-                                  />
+                                  <div className="relative">
+                                    <textarea 
+                                      required
+                                      value={newAnnouncement.message}
+                                      onChange={e => setNewAnnouncement({ ...newAnnouncement, message: e.target.value })}
+                                      className="w-full p-4 pl-12 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal h-24 resize-none"
+                                      dir="rtl"
+                                    />
+                                    <button 
+                                      type="button"
+                                      onClick={() => setShowEmojiPicker(showEmojiPicker === 'message' ? null : 'message')}
+                                      className="absolute left-4 top-4 text-gray-400 hover:text-brand-teal transition-colors"
+                                    >
+                                      <Smile className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                  {showEmojiPicker === 'message' && (
+                                    <div ref={emojiPickerRef} className="absolute left-0 bottom-full mb-2 z-50">
+                                      <EmojiPicker 
+                                        onEmojiClick={(emojiData) => {
+                                          setNewAnnouncement({ ...newAnnouncement, message: (newAnnouncement.message || '') + emojiData.emoji });
+                                        }}
+                                        theme={EmojiTheme.LIGHT}
+                                        searchPlaceholder="ابحث عن إيموجي..."
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                                 
                                 <div className="space-y-2">
@@ -2051,6 +2119,7 @@ export default function AdminPanel({
                                     position: ann.position || 'bottom',
                                     platform: ann.platform || 'both',
                                     size: ann.size || 'md',
+                                    shape: ann.shape || 'rounded',
                                     maxViews: ann.maxViews || 0,
                                     autoHideSeconds: ann.autoHideSeconds || 0,
                                     startDate: ann.startDate || '',

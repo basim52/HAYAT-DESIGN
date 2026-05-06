@@ -36,7 +36,8 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
     onAction: () => {},
     position: 'bottom' as 'top' | 'center' | 'bottom',
     platform: 'both' as 'web' | 'mobile' | 'both',
-    size: 'md' as 'sm' | 'md' | 'lg' | 'xl'
+    size: 'md' as 'sm' | 'md' | 'lg' | 'xl',
+    shape: 'rounded' as 'rectangle' | 'rounded' | 'circle'
   });
   
   const remindersTimers = useRef<NodeJS.Timeout[]>([]);
@@ -100,7 +101,8 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
           onAction: () => {},
           position: validAnnouncement.position || 'bottom',
           platform: validAnnouncement.platform || 'both',
-          size: validAnnouncement.size || 'md'
+          size: validAnnouncement.size || 'md',
+          shape: validAnnouncement.shape || 'rounded'
         });
         setShowToast(true);
 
@@ -116,7 +118,7 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
     }, (err) => handleFirestoreError(err, OperationType.GET, 'announcements'));
     
     return unsub;
-  }, []);
+  }, [currentPlatform]);
 
   // Cart Reminder Logic (3-stage)
   useEffect(() => {
@@ -175,6 +177,7 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
       onAction={toastData.onAction}
       position={toastData.position}
       size={toastData.size}
+      shape={toastData.shape}
     />
   );
 }

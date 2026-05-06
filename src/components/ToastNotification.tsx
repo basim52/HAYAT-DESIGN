@@ -11,6 +11,7 @@ export interface ToastNotificationProps {
   onAction?: () => void;
   position?: 'top' | 'center' | 'bottom';
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  shape?: 'rectangle' | 'rounded' | 'circle';
 }
 
 export default function ToastNotification({
@@ -22,7 +23,8 @@ export default function ToastNotification({
   actionLabel,
   onAction,
   position = 'bottom',
-  size = 'md'
+  size = 'md',
+  shape = 'rounded'
 }: ToastNotificationProps) {
   const getIcon = () => {
     switch (type) {
@@ -49,6 +51,15 @@ export default function ToastNotification({
       case 'xl': return 'max-w-[calc(100%-2rem)] md:max-w-7xl';
       case 'md':
       default: return 'max-w-md';
+    }
+  };
+
+  const getShapeClasses = () => {
+    switch (shape) {
+      case 'rectangle': return 'rounded-none';
+      case 'circle': return 'rounded-full aspect-square flex flex-col items-center justify-center text-center p-8';
+      case 'rounded':
+      default: return 'rounded-[32px]';
     }
   };
 
@@ -97,18 +108,18 @@ export default function ToastNotification({
           exit={getExit()}
           className={`fixed z-[200] w-[90%] ${getSizeClasses()} ${getPositionClasses()}`}
         >
-          <div className={`p-4 rounded-3xl border shadow-2xl backdrop-blur-xl ${getBg()} bg-white/95 flex flex-col gap-4`}>
-            <div className="flex items-start gap-4">
+          <div className={`p-6 ${getShapeClasses()} border shadow-2xl backdrop-blur-xl ${getBg()} bg-white/95 flex flex-col gap-4 overflow-hidden relative`}>
+            <div className={`flex items-start gap-4 ${shape === 'circle' ? 'flex-col items-center justify-center h-full' : ''}`}>
               <div className="p-2.5 rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
                 {getIcon()}
               </div>
-              <div className="flex-1 text-right">
+              <div className={`flex-1 ${shape === 'circle' ? 'text-center' : 'text-right'}`}>
                 <h4 className="text-sm font-black text-charcoal mb-1">{title}</h4>
                 <p className="text-xs text-gray-500 font-bold leading-relaxed">{message}</p>
               </div>
               <button 
                 onClick={onClose}
-                className="p-1 hover:bg-black/5 rounded-full transition-colors"
+                className={`p-1 hover:bg-black/5 rounded-full transition-colors ${shape === 'circle' ? 'absolute top-6 right-6' : ''}`}
                 aria-label="Close notification"
               >
                 <X className="w-4 h-4 text-gray-400" />

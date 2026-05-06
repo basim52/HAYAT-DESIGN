@@ -75,6 +75,7 @@ export interface Announcement {
   platform: 'web' | 'mobile' | 'both';
   position: 'top' | 'center' | 'bottom';
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  shape?: 'rectangle' | 'rounded' | 'circle';
   active: boolean;
   maxViews?: number;
   autoHideSeconds?: number;

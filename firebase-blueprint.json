@@ -138,6 +138,7 @@
         "message": { "type": "string" },
         "type": { "type": "string", "enum": ["popup", "banner"] },
         "size": { "type": "string", "enum": ["sm", "md", "lg", "xl"] },
+        "shape": { "type": "string", "enum": ["rectangle", "rounded", "circle"] },
         "position": { "type": "string", "enum": ["top", "center", "bottom"] },
         "platform": { "type": "string", "enum": ["web", "mobile", "both"] },
         "active": { "type": "boolean" },

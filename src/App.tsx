@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import SearchMobile from './components/SearchMobile';
@@ -34,19 +34,36 @@ export default function App() {
   const { user, profile, isAdmin } = useAuth();
   const { isMobileView } = useTheme();
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [allBanners, setAllBanners] = useState<any[]>([]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [heroImage, setHeroImage] = useState('https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop');
-  const [banners, setBanners] = useState<{ id: string; image: string; title?: string; subtitle?: string; active: boolean; platform?: string }[]>([]);
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [generalConfig, setGeneralConfig] = useState<any>(null);
 
-  // Firestore Sync
+  // Memoized filters to avoid flashes and redundant subscriptions
+  const categories = useMemo(() => {
+    const platform = isMobileView ? 'mobile' : 'web';
+    const filtered = allCategories.filter((c: any) => !c.platform || c.platform === 'both' || c.platform === platform);
+    return filtered.length > 0 ? filtered : initialCategories;
+  }, [allCategories, isMobileView]);
+
+  const banners = useMemo(() => {
+    const platform = isMobileView ? 'mobile' : 'web';
+    return allBanners.filter(b => b.active && (!b.platform || b.platform === 'both' || b.platform === platform));
+  }, [allBanners, isMobileView]);
+
+  const heroImage = useMemo(() => {
+    if (!generalConfig) return 'https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop';
+    const img = isMobileView ? (generalConfig.heroImageMobile || generalConfig.heroImage) : (generalConfig.heroImageWeb || generalConfig.heroImage);
+    return img || 'https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop';
+  }, [generalConfig, isMobileView]);
+
+  // Firestore Sync - Once on mount
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
@@ -56,16 +73,11 @@ export default function App() {
     const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
       setAllCategories(docs);
-      const platform = isMobileView ? 'mobile' : 'web';
-      const filtered = docs.filter((c: any) => c.platform === platform || c.platform === 'both' || !c.platform);
-      setCategories(filtered.length > 0 ? filtered : initialCategories);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'categories'));
 
     const unsubBanners = onSnapshot(collection(db, 'banners'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const platform = isMobileView ? 'mobile' : 'web';
-      const activeBanners = docs.filter(b => b.active && (b.platform === platform || b.platform === 'both' || !b.platform));
-      setBanners(activeBanners);
+      setAllBanners(docs);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'banners'));
 
     const unsubTestimonials = onSnapshot(collection(db, 'testimonials'), (snapshot) => {
@@ -75,9 +87,7 @@ export default function App() {
 
     const unsubConfig = onSnapshot(doc(db, 'config', 'general'), (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
-        const img = isMobileView ? (data.heroImageMobile || data.heroImage) : (data.heroImageWeb || data.heroImage);
-        setHeroImage(img || 'https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop');
+        setGeneralConfig(docSnap.data());
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'config/general'));
 
