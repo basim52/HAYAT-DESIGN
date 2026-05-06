@@ -1,7 +1,7 @@
 import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout, MessageSquare, Star, Bell, ShoppingCart, Ticket } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
-import { Product, Category, Order, Testimonial, Coupon } from '../types';
+import { Product, Category, Order, Testimonial, Coupon, Announcement } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
@@ -66,13 +66,15 @@ export default function AdminPanel({
       { id: '3', delayMinutes: 1440, title: 'الفرصة الأخيرة!', message: 'أكمل طلبك قبل نفاذ الكمية، نحن متحمسون لخدمتك.' }
     ]
   });
-  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementFilter, setAnnouncementFilter] = useState<'all' | 'web' | 'mobile'>('all');
   const [isAddingAnnouncement, setIsAddingAnnouncement] = useState(false);
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
-  const [newAnnouncement, setNewAnnouncement] = useState<any>({
+  const [newAnnouncement, setNewAnnouncement] = useState<Partial<Announcement>>({
     title: '',
     message: '',
     type: 'popup',
+    size: 'md',
     platform: 'both',
     position: 'bottom',
     active: true,
@@ -421,6 +423,7 @@ export default function AdminPanel({
         title: '', 
         message: '', 
         type: 'popup', 
+        size: 'md',
         platform: 'both',
         position: 'bottom',
         active: true,
@@ -1844,22 +1847,47 @@ export default function AdminPanel({
 
                     {/* Announcements Section */}
                     <div className="bg-white p-10 rounded-[50px] border border-border-subtle shadow-sm space-y-8">
-                      <div className="flex items-center justify-between border-b border-border-subtle pb-6 text-right">
-                        <div className="flex items-center gap-3">
-                          <MessageSquare className="w-6 h-6 text-brand-teal" />
-                          <h4 className="font-black text-xl">الإعلانات والرسائل المنبثقة</h4>
+                      <div className="flex flex-col gap-6 border-b border-border-subtle pb-6 text-right">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <MessageSquare className="w-6 h-6 text-brand-teal" />
+                            <h4 className="font-black text-xl">الإعلانات والرسائل المنبثقة</h4>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setEditingAnnouncementId(null);
+                              setNewAnnouncement({ 
+                                title: '', 
+                                message: '', 
+                                type: 'popup', 
+                                size: 'md',
+                                platform: 'both',
+                                position: 'bottom',
+                                active: true 
+                              });
+                              setIsAddingAnnouncement(true);
+                            }}
+                            className="flex items-center gap-2 bg-brand-teal text-white px-6 py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition-opacity"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>إعلان جديد</span>
+                          </button>
                         </div>
-                        <button
-                          onClick={() => {
-                            setEditingAnnouncementId(null);
-                            setNewAnnouncement({ title: '', message: '', type: 'popup', active: true });
-                            setIsAddingAnnouncement(true);
-                          }}
-                          className="flex items-center gap-2 bg-brand-teal text-white px-6 py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition-opacity"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>إعلان جديد</span>
-                        </button>
+                        
+                        <div className="flex items-center gap-2 bg-muted-bg/50 p-1.5 rounded-2xl w-fit self-end">
+                          <button 
+                            onClick={() => setAnnouncementFilter('all')}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${announcementFilter === 'all' ? 'bg-white text-brand-teal shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                          >الكل</button>
+                          <button 
+                            onClick={() => setAnnouncementFilter('web')}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${announcementFilter === 'web' ? 'bg-white text-brand-teal shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                          >متصفح (Web)</button>
+                          <button 
+                            onClick={() => setAnnouncementFilter('mobile')}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${announcementFilter === 'mobile' ? 'bg-white text-brand-teal shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                          >جوال (Mobile)</button>
+                        </div>
                       </div>
 
                       <AnimatePresence>
@@ -1892,6 +1920,19 @@ export default function AdminPanel({
                                   >
                                     <option value="popup">منبثق (Popup)</option>
                                     <option value="banner">شريط (Banner)</option>
+                                  </select>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">حجم المنبثق</label>
+                                  <select 
+                                    value={newAnnouncement.size || 'md'}
+                                    onChange={e => setNewAnnouncement({ ...newAnnouncement, size: e.target.value as any })}
+                                    className="w-full p-4 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal appearance-none"
+                                  >
+                                    <option value="sm">صغير (Small)</option>
+                                    <option value="md">متوسط (Medium)</option>
+                                    <option value="lg">كبير (Large)</option>
+                                    <option value="xl">كامل العرض (Full Width)</option>
                                   </select>
                                 </div>
                                 <div className="space-y-2 md:col-span-2">
@@ -1985,7 +2026,12 @@ export default function AdminPanel({
                       </AnimatePresence>
 
                       <div className="space-y-4">
-                        {announcements.map((ann) => (
+                        {announcements
+                          .filter(ann => {
+                            if (announcementFilter === 'all') return true;
+                            return ann.platform === announcementFilter || ann.platform === 'both';
+                          })
+                          .map((ann) => (
                           <div key={ann.id} className="bg-muted-bg/30 p-6 rounded-3xl border border-border-subtle flex items-center justify-between">
                             <div className="flex items-center gap-4">
                               <div className={`p-3 rounded-2xl ${ann.active ? 'bg-brand-teal text-white' : 'bg-gray-200 text-gray-400'}`}>
@@ -2004,6 +2050,7 @@ export default function AdminPanel({
                                     ...ann,
                                     position: ann.position || 'bottom',
                                     platform: ann.platform || 'both',
+                                    size: ann.size || 'md',
                                     maxViews: ann.maxViews || 0,
                                     autoHideSeconds: ann.autoHideSeconds || 0,
                                     startDate: ann.startDate || '',

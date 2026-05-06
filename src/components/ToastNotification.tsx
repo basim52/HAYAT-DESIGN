@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, ShoppingCart, X, Info, AlertTriangle } from 'lucide-react';
 
-interface ToastNotificationProps {
+export interface ToastNotificationProps {
   show: boolean;
   onClose: () => void;
   title: string;
@@ -10,6 +10,7 @@ interface ToastNotificationProps {
   actionLabel?: string;
   onAction?: () => void;
   position?: 'top' | 'center' | 'bottom';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export default function ToastNotification({
@@ -20,7 +21,8 @@ export default function ToastNotification({
   type,
   actionLabel,
   onAction,
-  position = 'bottom'
+  position = 'bottom',
+  size = 'md'
 }: ToastNotificationProps) {
   const getIcon = () => {
     switch (type) {
@@ -37,6 +39,16 @@ export default function ToastNotification({
       case 'announcement': return 'bg-gold/5 border-gold/20';
       case 'warning': return 'bg-red-50 border-red-200';
       default: return 'bg-brand-teal/5 border-brand-teal/20';
+    }
+  };
+
+  const getSizeClasses = () => {
+    switch (size) {
+      case 'sm': return 'max-w-xs';
+      case 'lg': return 'max-w-2xl';
+      case 'xl': return 'max-w-[calc(100%-2rem)] md:max-w-7xl';
+      case 'md':
+      default: return 'max-w-md';
     }
   };
 
@@ -83,7 +95,7 @@ export default function ToastNotification({
           initial={getInitial()}
           animate={getAnimate()}
           exit={getExit()}
-          className={`fixed z-[200] w-[90%] max-w-md ${getPositionClasses()}`}
+          className={`fixed z-[200] w-[90%] ${getSizeClasses()} ${getPositionClasses()}`}
         >
           <div className={`p-4 rounded-3xl border shadow-2xl backdrop-blur-xl ${getBg()} bg-white/95 flex flex-col gap-4`}>
             <div className="flex items-start gap-4">

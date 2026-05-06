@@ -131,12 +131,13 @@
     },
     "Announcement": {
       "title": "Announcement",
-      "description": "Platform-specific broadcast message or popup for all users.",
+      "description": "Platform-specific broadcast message or popup for all users with size controls.",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
         "message": { "type": "string" },
         "type": { "type": "string", "enum": ["popup", "banner"] },
+        "size": { "type": "string", "enum": ["sm", "md", "lg", "xl"] },
         "position": { "type": "string", "enum": ["top", "center", "bottom"] },
         "platform": { "type": "string", "enum": ["web", "mobile", "both"] },
         "active": { "type": "boolean" },

@@ -66,3 +66,19 @@ export interface Testimonial {
   rating: number;
   date: string;
 }
+
+export interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  type: 'popup' | 'banner';
+  platform: 'web' | 'mobile' | 'both';
+  position: 'top' | 'center' | 'bottom';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  active: boolean;
+  maxViews?: number;
+  autoHideSeconds?: number;
+  startDate?: string;
+  endDate?: string;
+  createdAt: string;
+}

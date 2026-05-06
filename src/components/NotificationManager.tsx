@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { doc, collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
-import ToastNotification from './ToastNotification';
+import ToastNotification, { ToastNotificationProps } from './ToastNotification';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import { Announcement } from '../types';
 
 interface ReminderStage {
   id: string;
@@ -14,20 +15,6 @@ interface ReminderStage {
 interface NotificationSettings {
   cartReminderEnabled: boolean;
   reminders: ReminderStage[];
-}
-
-interface Announcement {
-  id: string;
-  title: string;
-  message: string;
-  type: 'popup' | 'banner';
-  position?: 'top' | 'center' | 'bottom';
-  platform?: 'web' | 'mobile' | 'both';
-  active: boolean;
-  maxViews?: number;
-  autoHideSeconds?: number;
-  startDate?: string;
-  endDate?: string;
 }
 
 interface NotificationManagerProps {
@@ -48,7 +35,8 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
     actionLabel: '', 
     onAction: () => {},
     position: 'bottom' as 'top' | 'center' | 'bottom',
-    platform: 'both' as 'web' | 'mobile' | 'both'
+    platform: 'both' as 'web' | 'mobile' | 'both',
+    size: 'md' as 'sm' | 'md' | 'lg' | 'xl'
   });
   
   const remindersTimers = useRef<NodeJS.Timeout[]>([]);
@@ -124,7 +112,8 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
           actionLabel: 'حسناً',
           onAction: () => {},
           position: validAnnouncement.position || 'bottom',
-          platform: validAnnouncement.platform || 'both'
+          platform: validAnnouncement.platform || 'both',
+          size: validAnnouncement.size || 'md'
         });
         setShowToast(true);
 
@@ -198,6 +187,7 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
       actionLabel={toastData.actionLabel}
       onAction={toastData.onAction}
       position={toastData.position}
+      size={toastData.size}
     />
   );
 }
