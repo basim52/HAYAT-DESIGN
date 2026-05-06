@@ -1,10 +1,10 @@
-import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon, Scissors } from 'lucide-react';
+import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon, Scissors, Ticket, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, FormEvent, useEffect, ChangeEvent } from 'react';
 import { BANK_DETAILS, PAYMENT_METHODS } from '../constants';
-import { CartItem, UserProfile } from '../types';
+import { CartItem, UserProfile, Coupon } from '../types';
 import { db } from '../lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, updateDoc, doc, increment } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import ImageEditorModal from './ImageEditorModal';
 
@@ -44,7 +44,139 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
   const [useAlternativeInfo, setUseAlternativeInfo] = useState(false);
   const [preferredMethod, setPreferredMethod] = useState<'whatsapp' | 'email' | null>(null);
 
-  const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // Coupon State
+  const [couponInput, setCouponInput] = useState('');
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  
+  const discountAmount = appliedCoupon ? (
+    appliedCoupon.type === 'percentage' 
+      ? (subtotal * appliedCoupon.value / 100)
+      : appliedCoupon.value
+  ) : 0;
+
+  const finalTotal = Math.max(0, subtotal - discountAmount);
+
+  const handleValidateCoupon = async () => {
+    if (!couponInput) return;
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+    try {
+      const q = query(
+        collection(db, 'coupons'), 
+        where('code', '==', couponInput.toUpperCase()),
+        where('active', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        setCouponError('كود الخصم غير صحيح أو غير فعال');
+        setAppliedCoupon(null);
+      } else {
+        const coupon = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Coupon;
+        
+        // Validation
+        if (coupon.expiryDate && new Date(coupon.expiryDate) < new Date()) {
+          setCouponError('عذراً، انتهت صلاحية هذا الكود');
+          setAppliedCoupon(null);
+        } else if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+          setCouponError('عذراً، وصل هذا الكود للحد الأقصى للاستخدام');
+          setAppliedCoupon(null);
+        } else if (subtotal < coupon.minOrder) {
+          setCouponError(`هذا الكود يتطلب حداً أدنى للشراء بقيمة ${coupon.minOrder} ر.س`);
+          setAppliedCoupon(null);
+        } else {
+          setAppliedCoupon(coupon);
+          setCouponError(null);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setCouponError('خطأ أثناء التحقق من الكود');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleOrderSubmission = async (e: FormEvent, preference: 'whatsapp' | 'email') => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      // Save to Firestore
+      const orderData = {
+        userId: userProfile?.id || 'guest',
+        ...formData,
+        items: cartItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          category: item.category,
+          image: item.image
+        })),
+        subtotal,
+        discount: discountAmount,
+        couponCode: appliedCoupon?.code || null,
+        total: finalTotal,
+        status: 'pending',
+        paymentMethod: selectedMethod.bankName,
+        hasReceipt: !!receiptImage,
+        createdAt: new Date().toISOString()
+      };
+      
+      await addDoc(collection(db, 'orders'), orderData);
+
+      // Increment coupon usage count if used
+      if (appliedCoupon) {
+        await updateDoc(doc(db, 'coupons', appliedCoupon.id), {
+          usageCount: increment(1)
+        });
+      }
+
+      const itemsList = cartItems
+        .map(item => `• ${item.name} (الكمية: ${item.quantity}) - السعر: ${item.price * item.quantity} ر.س`)
+        .join('\n');
+
+      const message = `*طلب جديد من حياة ديزاين*\n\n` +
+        `*بيانات العميل:*\n` +
+        `الاسم: ${formData.customerName}\n` +
+        `رقم الجوال: ${formData.phone}\n` +
+        `العنوان: ${formData.address}\n` +
+        (formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : '') +
+        `\n*تفاصيل الطلب:*\n${itemsList}\n\n` +
+        `*ملخص الحساب:*\n` +
+        `المجموع الفرعي: ${subtotal} ر.س\n` +
+        (appliedCoupon ? `الخصم (${appliedCoupon.code}): -${discountAmount} ر.س\n` : '') +
+        `*طريقة الدفع:* ${selectedMethod.bankName}\n` +
+        `*الإجمالي النهائي:* ${finalTotal} ر.س\n\n` +
+        `${receiptImage ? '*تم إرفاق إيصال التحويل بداخل النظام*' : '*سأقوم بإرسال إيصال التحويل الآن*'}`;
+
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
+      
+      const subject = `طلب جديد - ${formData.customerName}`;
+      const emailBody = `الاسم: ${formData.customerName}\nالجوال: ${formData.phone}\nالعنوان: ${formData.address}\n${formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : ''}\nتفاصيل الطلب:\n${cartItems.map(i => `${i.name} x${i.quantity}`).join('\n')}\n\nالإجمالي: ${finalTotal} ر.س`;
+      const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+
+      setOrderUrls({ whatsappUrl, mailtoUrl });
+      setPreferredMethod(preference);
+      
+      if (preference === 'whatsapp') {
+        window.open(whatsappUrl, '_blank');
+      }
+      
+      setShowSuccess(true);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'orders');
+      alert('حدث خطأ أثناء تسجيل الطلب، يرجى المحاولة مرة أخرى');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,70 +197,6 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
     navigator.clipboard.writeText(value);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const handleOrderSubmission = async (e: FormEvent, preference: 'whatsapp' | 'email') => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    try {
-      // Save to Firestore
-      const orderData = {
-        userId: userProfile?.id || 'guest',
-        ...formData,
-        items: cartItems.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          category: item.category,
-          image: item.image
-        })),
-        total,
-        status: 'pending',
-        paymentMethod: selectedMethod.bankName,
-        hasReceipt: !!receiptImage,
-        createdAt: new Date().toISOString()
-      };
-      
-      await addDoc(collection(db, 'orders'), orderData);
-
-      const itemsList = cartItems
-        .map(item => `• ${item.name} (الكمية: ${item.quantity}) - السعر: ${item.price * item.quantity} ر.س`)
-        .join('\n');
-
-      const message = `*طلب جديد من حياة ديزاين*\n\n` +
-        `*بيانات العميل:*\n` +
-        `الاسم: ${formData.customerName}\n` +
-        `رقم الجوال: ${formData.phone}\n` +
-        `العنوان: ${formData.address}\n` +
-        (formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : '') +
-        `\n*تفاصيل الطلب:*\n${itemsList}\n\n` +
-        `*طريقة الدفع:* ${selectedMethod.bankName}\n` +
-        `*الإجمالي:* ${total} ر.س\n\n` +
-        `${receiptImage ? '*تم إرفاق إيصال التحويل بداخل النظام*' : '*سأقوم بإرسال إيصال التحويل الآن*'}`;
-
-      const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
-      
-      const subject = `طلب جديد - ${formData.customerName}`;
-      const emailBody = `الاسم: ${formData.customerName}\nالجوال: ${formData.phone}\nالعنوان: ${formData.address}\n${formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : ''}\nتفاصيل الطلب:\n${cartItems.map(i => `${i.name} x${i.quantity}`).join('\n')}\n\nالإجمالي: ${total} ر.س`;
-      const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
-
-      setOrderUrls({ whatsappUrl, mailtoUrl });
-      setPreferredMethod(preference);
-      
-      if (preference === 'whatsapp') {
-        window.open(whatsappUrl, '_blank');
-      }
-      
-      setShowSuccess(true);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'orders');
-      alert('حدث خطأ أثناء تسجيل الطلب، يرجى المحاولة مرة أخرى');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   return (
@@ -220,7 +288,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
 
                 <div className="grid md:grid-cols-2 gap-12">
                   {/* Bank Details */}
-                  <div className="space-y-6">
+                  <div className="space-y-6 text-right" dir="rtl">
                     <div className="space-y-4">
                       <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">اختر وسيلة الدفع</h3>
                       <div className="grid grid-cols-3 gap-2">
@@ -242,7 +310,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                       <div className="absolute -top-4 -left-4 w-24 h-24 bg-gold/5 rounded-full" />
                       <div className="flex items-center gap-3 mb-6">
                         {selectedMethod.type === 'bank' ? <Landmark className="w-6 h-6 text-gold" /> : <Smartphone className="w-6 h-6 text-brand-teal" />}
-                        <h3 className="font-bold">{selectedMethod.bankName}</h3>
+                        <h4 className="font-bold">{selectedMethod.bankName}</h4>
                       </div>
                       <div className="space-y-4 text-sm">
                         <div>
@@ -284,13 +352,77 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
                       </div>
                     </div>
 
+                    {/* Coupon Section */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">هل لديك كود خصم؟</label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input 
+                            type="text"
+                            placeholder="أدخل الكود هنا"
+                            value={couponInput}
+                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                            className={`w-full p-4 bg-muted-bg/30 border rounded-2xl text-xs font-bold outline-none transition-all ${couponError ? 'border-red-500 focus:border-red-500' : appliedCoupon ? 'border-green-500 focus:border-green-500' : 'border-border-subtle focus:border-brand-purple'}`}
+                            dir="ltr"
+                            disabled={!!appliedCoupon}
+                          />
+                          <Tag className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 ${appliedCoupon ? 'text-green-500' : 'text-gray-300'}`} />
+                        </div>
+                        {appliedCoupon ? (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setAppliedCoupon(null);
+                              setCouponInput('');
+                            }}
+                            className="px-6 bg-red-50 text-red-500 rounded-2xl text-[10px] font-black hover:bg-red-100 transition-all border border-red-200"
+                          >
+                            حذف
+                          </button>
+                        ) : (
+                          <button 
+                            type="button"
+                            onClick={handleValidateCoupon}
+                            disabled={!couponInput || isValidatingCoupon}
+                            className="px-6 bg-brand-purple text-white rounded-2xl text-[10px] font-black hover:bg-brand-purple/90 transition-all shadow-lg shadow-brand-purple/20 disabled:opacity-50"
+                          >
+                            {isValidatingCoupon ? '...' : 'تفعيل'}
+                          </button>
+                        )}
+                      </div>
+                      {couponError && <p className="text-[9px] text-red-500 font-bold px-1">{couponError}</p>}
+                      {appliedCoupon && (
+                        <p className="text-[9px] text-green-600 font-bold px-1">
+                          تم تطبيق كود الخصم بنجاح! ({appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}%` : `${appliedCoupon.value} ر.س`})
+                        </p>
+                      )}
+                    </div>
+
                     <div className="flex items-center gap-4 p-4 bg-green-50 rounded-2xl border border-green-100">
                       <div className="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
                         <CheckCircle2 className="w-6 h-6" />
                       </div>
                       <p className="text-xs text-green-800 leading-relaxed">
-                        يرجى تحويل مبلغ <span className="font-bold">{total} ر.س</span> عبر <span className="font-bold">{selectedMethod.bankName}</span> ثم تعبئة بياناتك لإكمال الطلب.
+                        يرجى تحويل مبلغ <span className="font-bold">{finalTotal} ر.س</span> عبر <span className="font-bold">{selectedMethod.bankName}</span> ثم تعبئة بياناتك لإكمال الطلب.
                       </p>
+                    </div>
+
+                    {/* Summary */}
+                    <div className="p-6 bg-muted-bg/50 rounded-3xl space-y-3">
+                      <div className="flex justify-between text-xs font-bold text-gray-500">
+                        <span>المجموع الفرعي</span>
+                        <span>{subtotal} ر.س</span>
+                      </div>
+                      {appliedCoupon && (
+                        <div className="flex justify-between text-xs font-bold text-green-600">
+                          <span>الخصم ({appliedCoupon.code})</span>
+                          <span>-{discountAmount} ر.س</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-lg font-black border-t border-border-subtle pt-3">
+                        <span>الإجمالي النهائي</span>
+                        <span className="text-brand-purple">{finalTotal} ر.س</span>
+                      </div>
                     </div>
                   </div>
 

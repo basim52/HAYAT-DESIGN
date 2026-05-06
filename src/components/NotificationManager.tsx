@@ -4,12 +4,16 @@ import { doc, collection, onSnapshot, query, where, orderBy, limit } from 'fireb
 import ToastNotification from './ToastNotification';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
+interface ReminderStage {
+  id: string;
+  delayMinutes: number;
+  title: string;
+  message: string;
+}
+
 interface NotificationSettings {
   cartReminderEnabled: boolean;
-  cartReminderMinutes: number;
-  cartReminderTitle: string;
-  cartReminderMessage: string;
-  maxReminders: number;
+  reminders: ReminderStage[];
 }
 
 interface Announcement {
@@ -17,7 +21,13 @@ interface Announcement {
   title: string;
   message: string;
   type: 'popup' | 'banner';
+  position?: 'top' | 'center' | 'bottom';
+  platform?: 'web' | 'mobile' | 'both';
   active: boolean;
+  maxViews?: number;
+  autoHideSeconds?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface NotificationManagerProps {
@@ -27,89 +37,151 @@ interface NotificationManagerProps {
 
 export default function NotificationManager({ cartCount, onOpenCart }: NotificationManagerProps) {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [currentAnnouncement, setCurrentAnnouncement] = useState<Announcement | null>(null);
   const [showToast, setShowToast] = useState(false);
-  const [toastData, setToastData] = useState({ title: '', message: '', type: 'info' as any, actionLabel: '', onAction: () => {} });
+  const [currentPlatform, setCurrentPlatform] = useState<'web' | 'mobile'>('web');
+  const [toastData, setToastData] = useState({ 
+    title: '', 
+    message: '', 
+    type: 'info' as any, 
+    actionLabel: '', 
+    onAction: () => {},
+    position: 'bottom' as 'top' | 'center' | 'bottom',
+    platform: 'both' as 'web' | 'mobile' | 'both'
+  });
   
-  const remindersCount = useRef<number>(0);
-  const cartTimer = useRef<NodeJS.Timeout | null>(null);
+  const remindersTimers = useRef<NodeJS.Timeout[]>([]);
+  const shownReminders = useRef<Set<string>>(new Set());
   const lastCartCount = useRef(cartCount);
+
+  // Platform detection
+  useEffect(() => {
+    const checkPlatform = () => {
+      setCurrentPlatform(window.innerWidth <= 768 ? 'mobile' : 'web');
+    };
+    checkPlatform();
+    window.addEventListener('resize', checkPlatform);
+    return () => window.removeEventListener('resize', checkPlatform);
+  }, []);
 
   // Fetch Settings
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'config', 'notifications'), (snap) => {
       if (snap.exists()) {
-        setSettings(snap.data() as NotificationSettings);
+        const data = snap.data();
+        if (!data.reminders) {
+          data.reminders = [
+            { id: '1', delayMinutes: 15, title: 'سلة المشتريات تنتظرك!', message: 'لديك منتجات رائعة في سلتك، لا تفوت فرصة اقتنائها الآن.' },
+            { id: '2', delayMinutes: 300, title: 'ما زلنا ننتظرك!', message: 'منتجاتك المفضلة لا تزال بانتظارك، أكمل طلبك الآن.' },
+            { id: '3', delayMinutes: 1440, title: 'الفرصة الأخيرة!', message: 'أكمل طلبك قبل نفاذ الكمية، نحن متحمسون لخدمتك.' }
+          ];
+        }
+        setSettings(data as NotificationSettings);
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'config/notifications'));
     return unsub;
   }, []);
 
-  // Fetch Announcements
+  // Fetch and show Announcements with enhanced logic
   useEffect(() => {
     const q = query(
       collection(db, 'announcements'),
       where('active', '==', true),
-      orderBy('createdAt', 'desc'),
-      limit(1)
+      orderBy('createdAt', 'desc')
     );
+    
     const unsub = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
-      setAnnouncements(docs);
-      if (docs.length > 0 && !currentAnnouncement) {
-        // Show first active announcement
+      const allAnnouncements = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
+      const now = new Date();
+
+      // Find first valid announcement
+      const validAnnouncement = allAnnouncements.find(ann => {
+        // 1. Check Platform targeting
+        if (ann.platform && ann.platform !== 'both' && ann.platform !== currentPlatform) return false;
+
+        // 2. Check Dates
+        if (ann.startDate && new Date(ann.startDate) > now) return false;
+        if (ann.endDate && new Date(ann.endDate) < now) return false;
+
+        // 3. Check Max Views
+        if (ann.maxViews) {
+          const views = parseInt(localStorage.getItem(`ann_views_${ann.id}`) || '0');
+          if (views >= ann.maxViews) return false;
+        }
+
+        return true;
+      });
+
+      if (validAnnouncement) {
         setToastData({
-          title: docs[0].title,
-          message: docs[0].message,
-          type: 'announcement',
+          title: validAnnouncement.title,
+          message: validAnnouncement.message,
+          type: validAnnouncement.type === 'popup' ? 'announcement' : 'info',
           actionLabel: 'حسناً',
-          onAction: () => {}
+          onAction: () => {},
+          position: validAnnouncement.position || 'bottom',
+          platform: validAnnouncement.platform || 'both'
         });
         setShowToast(true);
-        setCurrentAnnouncement(docs[0]);
+
+        // Update view count
+        const currentViews = parseInt(localStorage.getItem(`ann_views_${validAnnouncement.id}`) || '0');
+        localStorage.setItem(`ann_views_${validAnnouncement.id}`, (currentViews + 1).toString());
+
+        // Auto hide if configured
+        if (validAnnouncement.autoHideSeconds) {
+          setTimeout(() => setShowToast(false), validAnnouncement.autoHideSeconds * 1000);
+        }
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'announcements'));
+    
     return unsub;
-  }, [currentAnnouncement]);
+  }, []);
 
-  // Cart Reminder Logic
+  // Cart Reminder Logic (3-stage)
   useEffect(() => {
-    if (!settings || !settings.cartReminderEnabled) return;
+    if (!settings || !settings.cartReminderEnabled || !settings.reminders) return;
 
     // Reset reminders if cart becomes empty
     if (cartCount === 0) {
-      remindersCount.current = 0;
-      if (cartTimer.current) clearTimeout(cartTimer.current);
+      shownReminders.current.clear();
+      remindersTimers.current.forEach(t => clearTimeout(t));
+      remindersTimers.current = [];
       return;
     }
 
-    // If items were added, reset timer
+    // If items were added, schedule all eligible reminders
     if (cartCount > lastCartCount.current) {
-      if (cartTimer.current) clearTimeout(cartTimer.current);
+      // Clear existing timers
+      remindersTimers.current.forEach(t => clearTimeout(t));
+      remindersTimers.current = [];
       
-      const delay = settings.cartReminderMinutes * 60 * 1000;
-      cartTimer.current = setTimeout(() => {
-        if (remindersCount.current < settings.maxReminders) {
+      settings.reminders.forEach(reminder => {
+        const timer = setTimeout(() => {
+          // Double check if cart is still not empty
+          if (shownReminders.current.has(reminder.id)) return;
+
           setToastData({
-            title: settings.cartReminderTitle || 'سلة المشتريات تنتظرك!',
-            message: settings.cartReminderMessage || 'لديك منتجات رائعة في سلتك، لا تفوت فرصة اقتنائها الآن.',
+            title: reminder.title,
+            message: reminder.message,
             type: 'cart',
             actionLabel: 'عرض السلة',
-            onAction: onOpenCart
+            onAction: onOpenCart,
+            position: 'bottom'
           });
           setShowToast(true);
-          remindersCount.current += 1;
-        }
-      }, delay);
+          shownReminders.current.add(reminder.id);
+        }, reminder.delayMinutes * 60 * 1000);
+        
+        remindersTimers.current.push(timer);
+      });
     }
 
     lastCartCount.current = cartCount;
 
     return () => {
-      if (cartTimer.current) clearTimeout(cartTimer.current);
+      remindersTimers.current.forEach(t => clearTimeout(t));
     };
-  }, [cartCount, settings, onOpenCart]);
+  }, [cartCount, settings, onOpenCart, currentPlatform]);
 
   return (
     <ToastNotification
@@ -120,6 +192,7 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
       type={toastData.type}
       actionLabel={toastData.actionLabel}
       onAction={toastData.onAction}
+      position={toastData.position}
     />
   );
 }

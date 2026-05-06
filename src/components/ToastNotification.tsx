@@ -9,6 +9,7 @@ interface ToastNotificationProps {
   type: 'cart' | 'announcement' | 'info' | 'warning';
   actionLabel?: string;
   onAction?: () => void;
+  position?: 'top' | 'center' | 'bottom';
 }
 
 export default function ToastNotification({
@@ -18,7 +19,8 @@ export default function ToastNotification({
   message,
   type,
   actionLabel,
-  onAction
+  onAction,
+  position = 'bottom'
 }: ToastNotificationProps) {
   const getIcon = () => {
     switch (type) {
@@ -38,14 +40,50 @@ export default function ToastNotification({
     }
   };
 
+  const getPositionClasses = () => {
+    switch (position) {
+      case 'top': return 'top-8 left-1/2 -translate-x-1/2';
+      case 'center': return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+      case 'bottom': 
+      default: return 'bottom-24 md:bottom-12 left-1/2 -translate-x-1/2';
+    }
+  };
+
+  const getInitial = () => {
+    switch (position) {
+      case 'top': return { opacity: 0, y: -100, x: '-50%' };
+      case 'center': return { opacity: 0, scale: 0.9, x: '-50%', y: '-50%' };
+      case 'bottom':
+      default: return { opacity: 0, y: 100, x: '-50%' };
+    }
+  };
+
+  const getAnimate = () => {
+    switch (position) {
+      case 'top': return { opacity: 1, y: 0, x: '-50%' };
+      case 'center': return { opacity: 1, scale: 1, x: '-50%', y: '-50%' };
+      case 'bottom':
+      default: return { opacity: 1, y: 0, x: '-50%' };
+    }
+  };
+
+  const getExit = () => {
+    switch (position) {
+      case 'top': return { opacity: 0, y: -100, x: '-50%' };
+      case 'center': return { opacity: 0, scale: 0.9, x: '-50%', y: '-50%' };
+      case 'bottom':
+      default: return { opacity: 0, y: 100, x: '-50%', scale: 0.95 };
+    }
+  };
+
   return (
     <AnimatePresence>
       {show && (
         <motion.div
-          initial={{ opacity: 0, y: 100, x: '-50%' }}
-          animate={{ opacity: 1, y: 0, x: '-50%' }}
-          exit={{ opacity: 0, y: 100, x: '-50%', scale: 0.95 }}
-          className="fixed bottom-24 md:bottom-12 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-md"
+          initial={getInitial()}
+          animate={getAnimate()}
+          exit={getExit()}
+          className={`fixed z-[200] w-[90%] max-w-md ${getPositionClasses()}`}
         >
           <div className={`p-4 rounded-3xl border shadow-2xl backdrop-blur-xl ${getBg()} bg-white/95 flex flex-col gap-4`}>
             <div className="flex items-start gap-4">

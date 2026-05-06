@@ -26,20 +26,23 @@ import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { useAuth } from './AuthContext';
+import { useTheme } from './ThemeContext';
 import LoginModal from './components/LoginModal';
 import { MessageCircle } from 'lucide-react';
 
 export default function App() {
   const { user, profile, isAdmin } = useAuth();
+  const { isMobileView } = useTheme();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [heroImage, setHeroImage] = useState('https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop');
-  const [banners, setBanners] = useState<{ id: string; image: string; title?: string; subtitle?: string; active: boolean }[]>([]);
+  const [banners, setBanners] = useState<{ id: string; image: string; title?: string; subtitle?: string; active: boolean; platform?: string }[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -52,12 +55,16 @@ export default function App() {
 
     const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
-      setCategories(docs.length > 0 ? docs : initialCategories);
+      setAllCategories(docs);
+      const platform = isMobileView ? 'mobile' : 'web';
+      const filtered = docs.filter((c: any) => c.platform === platform || c.platform === 'both' || !c.platform);
+      setCategories(filtered.length > 0 ? filtered : initialCategories);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'categories'));
 
     const unsubBanners = onSnapshot(collection(db, 'banners'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const activeBanners = docs.filter(b => b.active);
+      const platform = isMobileView ? 'mobile' : 'web';
+      const activeBanners = docs.filter(b => b.active && (b.platform === platform || b.platform === 'both' || !b.platform));
       setBanners(activeBanners);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'banners'));
 
@@ -68,7 +75,9 @@ export default function App() {
 
     const unsubConfig = onSnapshot(doc(db, 'config', 'general'), (docSnap) => {
       if (docSnap.exists()) {
-        setHeroImage(docSnap.data().heroImage);
+        const data = docSnap.data();
+        const img = isMobileView ? (data.heroImageMobile || data.heroImage) : (data.heroImageWeb || data.heroImage);
+        setHeroImage(img || 'https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop');
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'config/general'));
 
@@ -171,7 +180,7 @@ export default function App() {
       <main className="pt-20 pb-24 md:pb-0">
         <SearchMobile onSearch={setSearchQuery} />
         <MobileCategoryBar 
-          categories={categories}
+          categories={allCategories}
           onCategoryClick={scrollToCategory}
         />
         <Hero 

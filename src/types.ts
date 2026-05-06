@@ -37,9 +37,25 @@ export interface Order {
   shortAddress?: string;
   items: CartItem[];
   total: number;
+  subtotal?: number;
+  discount?: number;
+  couponCode?: string;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
   paymentMethod?: string;
   hasReceipt?: boolean;
+  createdAt: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  minOrder: number;
+  expiryDate?: string;
+  active: boolean;
+  usageLimit?: number;
+  usageCount: number;
   createdAt: string;
 }
 

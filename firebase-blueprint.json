@@ -34,9 +34,23 @@
       "properties": {
         "name": { "type": "string" },
         "slug": { "type": "string" },
-        "image": { "type": "string" }
+        "image": { "type": "string" },
+        "platform": { "type": "string", "enum": ["web", "mobile", "both"] }
       },
       "required": ["name", "slug"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Promotional images for hero slider.",
+      "type": "object",
+      "properties": {
+        "image": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "active": { "type": "boolean" },
+        "platform": { "type": "string", "enum": ["web", "mobile", "both"] }
+      },
+      "required": ["image", "active", "platform"]
     },
     "Order": {
       "title": "Order",
@@ -49,17 +63,38 @@
         "address": { "type": "string" },
         "items": { "type": "array" },
         "total": { "type": "number" },
+        "discount": { "type": "number" },
+        "couponCode": { "type": "string" },
+        "subtotal": { "type": "number" },
         "status": { "type": "string", "enum": ["pending", "processing", "completed", "cancelled"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "items", "total", "status", "createdAt"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Discount codes for promotions.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "type": { "type": "string", "enum": ["percentage", "fixed"] },
+        "value": { "type": "number" },
+        "minOrder": { "type": "number" },
+        "expiryDate": { "type": "string", "format": "date-time" },
+        "active": { "type": "boolean" },
+        "usageLimit": { "type": "number" },
+        "usageCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "type", "value", "active", "createdAt"]
     },
     "AppConfig": {
       "title": "App Config",
       "description": "Global application settings.",
       "type": "object",
       "properties": {
-        "heroImage": { "type": "string" }
+        "heroImageWeb": { "type": "string" },
+        "heroImageMobile": { "type": "string" }
       }
     },
     "Testimonial": {
@@ -76,28 +111,42 @@
     },
     "NotificationSettings": {
       "title": "Notification Settings",
-      "description": "Admin configuration for cart reminders and popups.",
+      "description": "Admin configuration for multi-stage cart reminders.",
       "type": "object",
       "properties": {
         "cartReminderEnabled": { "type": "boolean" },
-        "cartReminderMinutes": { "type": "number" },
-        "cartReminderTitle": { "type": "string" },
-        "cartReminderMessage": { "type": "string" },
-        "maxReminders": { "type": "number" }
+        "reminders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "delayMinutes": { "type": "number" },
+              "title": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
       }
     },
     "Announcement": {
       "title": "Announcement",
-      "description": "Broadcast message or popup for all users.",
+      "description": "Platform-specific broadcast message or popup for all users.",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
         "message": { "type": "string" },
         "type": { "type": "string", "enum": ["popup", "banner"] },
+        "position": { "type": "string", "enum": ["top", "center", "bottom"] },
+        "platform": { "type": "string", "enum": ["web", "mobile", "both"] },
         "active": { "type": "boolean" },
+        "maxViews": { "type": "number" },
+        "autoHideSeconds": { "type": "number" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["title", "message", "type", "active"]
+      "required": ["title", "message", "type", "platform", "active"]
     }
   },
   "firestore": {
@@ -117,6 +166,10 @@
       "schema": "Order",
       "description": "Customer orders."
     },
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Discount coupons."
+    },
     "/config/general": {
       "schema": "AppConfig",
       "description": "Global settings."
@@ -128,6 +181,10 @@
     "/announcements/{announcementId}": {
       "schema": "Announcement",
       "description": "Global announcements and popups."
+    },
+    "/banners/{bannerId}": {
+      "schema": "Banner",
+      "description": "Hero slider images."
     },
     "/testimonials/{testimonialId}": {
       "schema": "Testimonial",
