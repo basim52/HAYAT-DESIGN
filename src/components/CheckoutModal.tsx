@@ -104,6 +104,34 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
 
   const handleOrderSubmission = async (e: FormEvent, preference: 'whatsapp' | 'email') => {
     e.preventDefault();
+    
+    // Explicit Validation with specific messages
+    if (!formData.customerName.trim()) {
+      alert('يرجى إدخال الاسم الكامل الثلاثي');
+      return;
+    }
+    if (!formData.phone.trim()) {
+      alert('يرجى إدخال رقم الجوال');
+      return;
+    }
+    const phoneRegex = /^(05|5|9665)[0-9]{8}$/;
+    if (!phoneRegex.test(formData.phone.trim())) {
+      alert('يرجى إدخال رقم جوال سعودي صحيح (مثال: 05xxxxxxx)');
+      return;
+    }
+    if (!formData.address.trim()) {
+      alert('يرجى إدخال عنوان التوصيل / الاستلام');
+      return;
+    }
+    if (!formData.shortAddress.trim()) {
+      alert('يرجى إدخال العنوان الوطني المختصر (مثال: AB1234)');
+      return;
+    }
+    if (!receiptImage) {
+      alert('يرجى إرفاق صورة إيصال التحويل البنكي لإتمام الطلب');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -475,14 +503,14 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           {/* Name */}
                           <div className="space-y-1.5">
                             <div className="flex justify-between items-center px-1">
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">الاسم الكامل</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">الاسم الكامل (الثلاثي)</label>
                               <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
                             </div>
                             <input
                               required
                               type="text"
                               placeholder="أدخل اسمك الثلاثي"
-                              className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm"
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-brand-purple/10 rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple transition-all text-sm font-bold"
                               value={formData.customerName}
                               onChange={e => setFormData({ ...formData, customerName: e.target.value })}
                             />
@@ -491,7 +519,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           {/* Phone */}
                           <div className="space-y-1.5">
                             <div className="flex justify-between items-center px-1">
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">رقم الجوال</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">رقم الجوال</label>
                               <span className="text-[9px] text-red-500 font-bold">* مطلوب (05xxxxxxx)</span>
                             </div>
                             <input
@@ -499,7 +527,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                               type="tel"
                               pattern="^(05|5|9665)[0-9]{8}$"
                               placeholder="05xxxxxxx"
-                              className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm text-right"
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-brand-purple/10 rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple transition-all text-sm text-right font-bold"
                               value={formData.phone}
                               onChange={e => setFormData({ ...formData, phone: e.target.value })}
                             />
@@ -508,14 +536,14 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           {/* Address */}
                           <div className="space-y-1.5">
                             <div className="flex justify-between items-center px-1">
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">عنوان التوصيل / الاستلام</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">عنوان التوصيل (المدينة والحي)</label>
                               <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
                             </div>
                             <textarea
                               required
                               placeholder="المدينة، الحي، اسم الشارع، تفاصيل أخرى"
                               rows={2}
-                              className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all resize-none text-sm"
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-brand-purple/10 rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple transition-all resize-none text-sm font-bold"
                               value={formData.address}
                               onChange={e => setFormData({ ...formData, address: e.target.value })}
                             />
@@ -524,14 +552,14 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           {/* Short Address */}
                           <div className="space-y-1.5">
                             <div className="flex justify-between items-center px-1">
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">العنوان الوطني المختصر</label>
-                              <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">العنوان الوطني المختصر</label>
+                              <span className="text-[9px] text-red-500 font-bold">* مطلوب (مثال: AB1234)</span>
                             </div>
                             <input
                               required
                               type="text"
-                              placeholder="مثال: AB1234"
-                              className="w-full px-5 py-4 bg-muted-bg/30 border border-border-subtle rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all text-sm uppercase font-bold tracking-widest"
+                              placeholder="AB1234"
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-brand-purple/10 rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple transition-all text-sm uppercase font-black tracking-widest"
                               value={formData.shortAddress}
                               onChange={e => setFormData({ ...formData, shortAddress: e.target.value.toUpperCase() })}
                             />
@@ -542,7 +570,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                       {/* Receipt Upload */}
                       <div className="space-y-1.5">
                         <div className="flex justify-between items-center px-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/60">إيصال التحويل</label>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">إيصال التحويل البنكي</label>
                           <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
                         </div>
                         <div className="relative">
@@ -556,12 +584,12 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           />
                           <label 
                             htmlFor="checkout-receipt-upload"
-                            className={`flex items-center justify-between px-5 py-4 border border-dashed rounded-3xl cursor-pointer transition-all ${receiptImage ? 'bg-brand-teal/5 border-brand-teal' : 'bg-muted-bg/30 border-border-subtle hover:bg-gold-light/20'}`}
+                            className={`flex items-center justify-between px-5 py-4 border border-dashed rounded-3xl cursor-pointer transition-all ${receiptImage ? 'bg-green-50 border-green-500' : 'bg-muted-bg/30 border-brand-purple/20 hover:bg-gold-light/20'}`}
                           >
-                            <span className={`text-xs font-bold truncate ${receiptImage ? 'text-brand-teal' : 'text-gray-500'}`}>
-                              {receiptImage ? 'تم اختيار صورة الإيصال بنجاح' : 'اضغط لرفع صورة الإيصال (إلزامي)'}
+                            <span className={`text-[11px] font-black underline-offset-4 underline ${receiptImage ? 'text-green-600' : 'text-brand-purple'}`}>
+                              {receiptImage ? 'تم التعرف على الإيصال - جاهز للإرسال' : 'اضغط هنا لرفع صورة الإيصال (ضروري جداً)'}
                             </span>
-                            <ImageIcon className={`w-4 h-4 ${receiptImage ? 'text-brand-teal' : 'text-gray-400'}`} />
+                            <ImageIcon className={`w-5 h-5 ${receiptImage ? 'text-green-500' : 'text-brand-purple'}`} />
                           </label>
                           {receiptImage && (
                             <div className="mt-2 flex items-center gap-2">
@@ -582,7 +610,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                     <div className="grid grid-cols-2 gap-3 pt-2">
                       <button
                         type="button"
-                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address || !formData.shortAddress || !receiptImage}
+                        disabled={isSubmitting}
                         onClick={(e) => handleOrderSubmission(e, 'whatsapp')}
                         className="py-4 bg-green-600 text-white rounded-2xl font-bold text-xs hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
@@ -595,7 +623,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                       </button>
                       <button
                         type="button"
-                        disabled={isSubmitting || !formData.customerName || !formData.phone || !formData.address || !formData.shortAddress || !receiptImage}
+                        disabled={isSubmitting}
                         onClick={(e) => handleOrderSubmission(e, 'email')}
                         className="py-4 bg-brand-purple text-white rounded-2xl font-bold text-xs hover:bg-brand-purple/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >

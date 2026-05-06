@@ -116,6 +116,11 @@ export default function App() {
     setIsCheckoutOpen(true);
   }, []);
 
+  const clearCart = useCallback(() => {
+    setCartItems([]);
+    localStorage.setItem('hayat_cart', '[]');
+  }, []);
+
   const filteredProductsWithSearch = useMemo(() => {
     return products.filter(product => 
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -264,10 +269,7 @@ export default function App() {
       <CheckoutModal 
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
-        onSuccess={() => {
-          setCartItems([]);
-          localStorage.removeItem('hayat_cart');
-        }}
+        onSuccess={clearCart}
         cartItems={cartItems}
         userProfile={profile}
       />
