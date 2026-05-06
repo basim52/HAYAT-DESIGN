@@ -23,6 +23,7 @@ export interface UserProfile {
   fullName: string;
   email: string;
   phone?: string;
+  city?: string;
   address?: string;
   shortAddress?: string;
   isAdmin?: boolean;
@@ -33,11 +34,14 @@ export interface Order {
   userId: string;
   customerName: string;
   phone: string;
+  city?: string;
   address: string;
   shortAddress?: string;
   items: CartItem[];
   total: number;
   subtotal?: number;
+  shippingCost?: number;
+  shippingType?: string;
   discount?: number;
   couponCode?: string;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
@@ -65,6 +69,29 @@ export interface Testimonial {
   content: string;
   rating: number;
   date: string;
+}
+
+export interface ShippingOption {
+  id: string;
+  name: string;
+  cost: number;
+  estimatedDays: string;
+  active: boolean;
+  cities: string[]; // Added this
+  allCities: boolean; // Added this to toggle between all cities or specific ones
+  createdAt: string;
+}
+
+export interface InvoiceConfig {
+  storeName: string;
+  storeAddress: string;
+  taxNumber: string;
+  phone: string;
+  email: string;
+  logoUrl?: string;
+  footerMessage?: string;
+  vatRate: number;
+  isTaxEnabled: boolean;
 }
 
 export interface Announcement {

@@ -1,11 +1,12 @@
-import { X, LogIn, Mail, Phone, MapPin, User as UserIcon, Package, ChevronDown, ChevronUp, Clock, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { X, LogIn, Mail, Phone, MapPin, User as UserIcon, Package, ChevronDown, ChevronUp, Clock, Lock, UserPlus, Eye, EyeOff, FileText, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import { signInWithGoogle, auth, db } from '../lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { useAuth } from '../AuthContext';
 import { doc, updateDoc, collection, query, where, orderBy, onSnapshot, setDoc } from 'firebase/firestore';
-import { Order } from '../types';
+import { Order, InvoiceConfig } from '../types';
+import { generateInvoicePDF } from '../lib/invoiceHelper';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -21,18 +22,30 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [invoiceConfig, setInvoiceConfig] = useState<InvoiceConfig | null>(null);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState<string | null>(null);
   
+  const SAUDI_CITIES = [
+    'الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام',
+    'الخبر', 'الظهران', 'القطيف', 'سيهات', 'الجبيل', 'الأحساء',
+    'تبوك', 'خميس مشيط', 'حائل', 'نجران', 'حفر الباطن',
+    'الخفجي', 'ينبع', 'بريدة', 'عنيزة', 'الرس', 'الباحة',
+    'أبها', 'جيزان', 'سكاكا', 'عرعر', 'طريف', 'القريات'
+  ].sort((a, b) => a.localeCompare(b, 'ar'));
+
   const [authFormData, setAuthFormData] = useState({
     email: '',
     password: '',
     fullName: '',
     phone: '',
+    city: '',
     shortAddress: '',
   });
 
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
+    city: '',
     address: '',
     shortAddress: '',
   });
@@ -43,6 +56,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setFormData({
         fullName: profile.fullName || '',
         phone: profile.phone || '',
+        city: profile.city || '',
         address: profile.address || '',
         shortAddress: profile.shortAddress || '',
       });
@@ -59,10 +73,36 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       );
       const unsub = onSnapshot(q, (snapshot) => {
         setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
-      });
+      }, (error) => console.error("Error fetching orders:", error));
       return unsub;
     }
   }, [user, activeTab]);
+
+  // Fetch invoice config
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'config', 'invoice'), (snapshot) => {
+      if (snapshot.exists()) {
+        setInvoiceConfig(snapshot.data() as InvoiceConfig);
+      }
+    });
+    return unsub;
+  }, []);
+
+  const handleDownloadInvoice = async (order: Order) => {
+    if (!invoiceConfig) {
+      alert("جاري تحميل إعدادات الفاتورة، يرجى المحاولة بعد قليل");
+      return;
+    }
+    setIsGeneratingInvoice(order.id);
+    try {
+      await generateInvoicePDF(order, invoiceConfig);
+    } catch (error) {
+      console.error("Error generating invoice:", error);
+      alert("حدث خطأ أثناء إنشاء الفاتورة");
+    } finally {
+      setIsGeneratingInvoice(null);
+    }
+  };
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
@@ -99,6 +139,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           fullName: authFormData.fullName,
           email: authFormData.email,
           phone: authFormData.phone,
+          city: authFormData.city,
           shortAddress: authFormData.shortAddress,
           isAdmin: false,
           createdAt: new Date().toISOString()
@@ -204,6 +245,26 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       />
                     </div>
                   </div>
+
+                  {authMode === 'register' && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">المدينة</label>
+                      <div className="relative">
+                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <select 
+                          required
+                          className="w-full p-4 pl-12 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right appearance-none font-bold"
+                          value={authFormData.city}
+                          onChange={e => setAuthFormData({...authFormData, city: e.target.value})}
+                        >
+                          <option value="">اختر المدينة</option>
+                          {SAUDI_CITIES.map(city => (
+                            <option key={city} value={city}>{city}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">العنوان الوطني المختصر <span className="text-red-500">* مطلوب</span></label>
@@ -331,10 +392,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 gap-3 text-right">
                           <div className="flex items-center justify-between gap-3 text-sm p-4 bg-white border border-border-subtle rounded-2xl">
-                            <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">رقم الجوال</span>
-                            <div className="flex items-center gap-3">
+                            <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">رقم الجوال والمدينة</span>
+                            <div className="flex flex-col items-end">
                               <span>{profile?.phone || 'غير مسجل'}</span>
-                              <Phone className="w-4 h-4 text-brand-teal" />
+                              <span className="text-[10px] text-brand-purple font-bold">{profile?.city || 'المدينة غير محددة'}</span>
                             </div>
                           </div>
                           <div className="flex flex-col gap-2 p-4 bg-white border border-border-subtle rounded-2xl">
@@ -390,10 +451,24 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">العنوان</label>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">المدينة</label>
+                            <select 
+                                required
+                                className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right font-bold"
+                                value={formData.city}
+                                onChange={e => setFormData({...formData, city: e.target.value})}
+                            >
+                                <option value="">اختر المدينة</option>
+                                {SAUDI_CITIES.map(city => (
+                                  <option key={city} value={city}>{city}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">العنوان (الحي والشارع)</label>
                             <textarea 
-                                placeholder="المدينة، الحي، الشارع..."
-                                className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right h-24 resize-none"
+                                placeholder="اسم الحي، الشارع، تفاصيل أخرى..."
+                                className="w-full p-4 bg-muted-bg rounded-2xl text-xs outline-none border border-transparent focus:border-brand-teal transition-all text-right h-20 resize-none"
                                 value={formData.address}
                                 onChange={e => setFormData({...formData, address: e.target.value})}
                             />
@@ -493,6 +568,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                                         <span>العنوان المختصر: {order.shortAddress}</span>
                                       </div>
                                     )}
+                                    
+                                    <div className="pt-4 mt-4 border-t border-gray-100">
+                                      <button
+                                        onClick={() => handleDownloadInvoice(order)}
+                                        disabled={isGeneratingInvoice === order.id}
+                                        className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-border-subtle hover:border-brand-purple hover:text-brand-purple rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                      >
+                                        {isGeneratingInvoice === order.id ? (
+                                          <Clock className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Download className="w-3 h-3" />
+                                        )}
+                                        <span>تحميل الفاتورة الضريبية (PDF)</span>
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </motion.div>

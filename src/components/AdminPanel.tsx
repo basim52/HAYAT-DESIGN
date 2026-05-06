@@ -1,7 +1,8 @@
-import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout, MessageSquare, Star, Bell, ShoppingCart, Ticket, Smile } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout, MessageSquare, Star, Bell, ShoppingCart, Ticket, Smile, Truck, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect, useRef } from 'react';
-import { Product, Category, Order, Testimonial, Coupon, Announcement } from '../types';
+import { Product, Category, Order, Testimonial, Coupon, Announcement, ShippingOption, InvoiceConfig } from '../types';
+import { SAUDI_CITIES } from '../constants';
 import { db } from '../lib/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, setDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
@@ -9,6 +10,7 @@ import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
 import { useAuth } from '../AuthContext';
 import ImageEditorModal from './ImageEditorModal';
 import { useTheme } from '../ThemeContext';
+import { generateInvoicePDF } from '../lib/invoiceHelper';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -31,7 +33,7 @@ export default function AdminPanel({
   const [heroPlatformTab, setHeroPlatformTab] = useState<'web' | 'mobile'>('web');
   const [catPlatformTab, setCatPlatformTab] = useState<'web' | 'mobile'>('web');
   const currentThemeConfig = (previewConfig?.platform === platformTab) ? previewConfig.config : themeConfigs[platformTab];
-  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders' | 'theme' | 'testimonials' | 'notifications' | 'coupons'>('orders');
+  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders' | 'theme' | 'testimonials' | 'notifications' | 'coupons' | 'shipping' | 'invoices'>('orders');
 
   useEffect(() => {
     if (activeTab === 'theme' && isOpen) {
@@ -51,6 +53,7 @@ export default function AdminPanel({
     rating: 5,
     date: new Date().toISOString().split('T')[0]
   });
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -71,8 +74,16 @@ export default function AdminPanel({
   const [announcementFilter, setAnnouncementFilter] = useState<'all' | 'web' | 'mobile'>('all');
   const [isAddingAnnouncement, setIsAddingAnnouncement] = useState(false);
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+  const [newAnnouncement, setNewAnnouncement] = useState<Partial<Announcement>>({
+    title: '',
+    message: '',
+    platform: 'both',
+    active: true,
+    type: 'banner'
+  });
   const [showEmojiPicker, setShowEmojiPicker] = useState<'title' | 'message' | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState<string | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -83,19 +94,27 @@ export default function AdminPanel({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  const [newAnnouncement, setNewAnnouncement] = useState<Partial<Announcement>>({
-    title: '',
-    message: '',
-    type: 'popup',
-    size: 'md',
-    shape: 'rounded',
-    platform: 'both',
-    position: 'bottom',
+  const [endDate, setEndDate] = useState<string>('');
+  const [invoiceConfig, setInvoiceConfig] = useState<InvoiceConfig>({
+    storeName: '',
+    storeAddress: '',
+    taxNumber: '',
+    phone: '',
+    email: '',
+    logoUrl: '',
+    footerMessage: 'شكراً لثقتكم بنا. نسعد بخدمتكم دائماً.',
+    vatRate: 15,
+    isTaxEnabled: false
+  });
+  const [isAddingShipping, setIsAddingShipping] = useState(false);
+  const [editingShippingId, setEditingShippingId] = useState<string | null>(null);
+  const [newShipping, setNewShipping] = useState<Partial<ShippingOption>>({
+    name: '',
+    cost: 0,
+    estimatedDays: '',
     active: true,
-    maxViews: 0,
-    autoHideSeconds: 0,
-    startDate: '',
-    endDate: ''
+    allCities: true,
+    cities: []
   });
 
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
@@ -137,6 +156,13 @@ export default function AdminPanel({
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState<string | null>(null);
+  const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<string | null>(null);
+  const [confirmDeleteCategoryId, setConfirmDeleteCategoryId] = useState<string | null>(null);
+  const [confirmDeleteShippingId, setConfirmDeleteShippingId] = useState<string | null>(null);
+  const [confirmDeleteCouponId, setConfirmDeleteCouponId] = useState<string | null>(null);
+  const [confirmDeleteTestimonialId, setConfirmDeleteTestimonialId] = useState<string | null>(null);
+  const [confirmDeleteAnnouncementId, setConfirmDeleteAnnouncementId] = useState<string | null>(null);
 
   // Image Editor State
   const [imageToEdit, setImageToEdit] = useState<{ src: string, callback: (cropped: string) => void, aspect?: number } | null>(null);
@@ -199,6 +225,18 @@ export default function AdminPanel({
         setCoupons(docs);
       }, (err) => handleFirestoreError(err, OperationType.GET, 'coupons'));
 
+      const qShipping = query(collection(db, 'shipping'), orderBy('createdAt', 'desc'));
+      const unsubShipping = onSnapshot(qShipping, (snap) => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ShippingOption));
+        setShippingOptions(docs);
+      }, (err) => handleFirestoreError(err, OperationType.GET, 'shipping'));
+
+      const unsubInvoiceConfig = onSnapshot(doc(db, 'config', 'invoice'), (snap) => {
+        if (snap.exists()) {
+          setInvoiceConfig(snap.data());
+        }
+      }, (err) => handleFirestoreError(err, OperationType.GET, 'config/invoice'));
+
       return () => {
         unsubOrders();
         unsubBanners();
@@ -207,6 +245,8 @@ export default function AdminPanel({
         unsubAnnouncements();
         unsubCoupons();
         unsubConfig();
+        unsubShipping();
+        unsubInvoiceConfig();
       };
     }
   }, [isOpen, isAdmin]);
@@ -347,23 +387,21 @@ export default function AdminPanel({
     }
   };
 
-  const handleRemoveCategory = async (id: string) => {
-    if (confirm('حذف القسم سيؤدي لإزالته من القائمة، هل أنت متأكد؟')) {
-      try {
-        await deleteDoc(doc(db, 'categories', id));
-      } catch (err) {
-        console.error(err);
-      }
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'categories', id));
+      setConfirmDeleteCategoryId(null);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const handleRemoveProduct = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
-      try {
-        await deleteDoc(doc(db, 'products', id));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `products/${id}`);
-      }
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'products', id));
+      setConfirmDeleteProductId(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `products/${id}`);
     }
   };
 
@@ -398,16 +436,27 @@ export default function AdminPanel({
     setIsAddingTestimonial(true);
   };
 
-  const handleRemoveTestimonial = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا الرأي؟')) {
-      try {
-        await deleteDoc(doc(db, 'testimonials', id));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `testimonials/${id}`);
-      }
+  const handleDeleteTestimonial = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'testimonials', id));
+      setConfirmDeleteTestimonialId(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `testimonials/${id}`);
     }
   };
 
+  const handleSaveInvoiceConfig = async () => {
+    try {
+      setIsSubmitting(true);
+      await setDoc(doc(db, 'config', 'invoice'), invoiceConfig);
+      alert('تم حفظ إعدادات الفواتير بنجاح');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'config/invoice');
+      alert('خطأ أثناء حفظ الإعدادات');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   const handleSaveNotifSettings = async () => {
     try {
       setIsSubmitting(true);
@@ -418,6 +467,22 @@ export default function AdminPanel({
       alert('خطأ أثناء حفظ الإعدادات');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadInvoice = async (order: Order) => {
+    if (!invoiceConfig) {
+      alert("جاري تحميل إعدادات الفاتورة...");
+      return;
+    }
+    setIsGeneratingInvoice(order.id);
+    try {
+      await generateInvoicePDF(order, invoiceConfig as any);
+    } catch (error) {
+      console.error("Error generating invoice:", error);
+      alert("حدث خطأ أثناء إنشاء الفاتورة");
+    } finally {
+      setIsGeneratingInvoice(null);
     }
   };
 
@@ -456,12 +521,11 @@ export default function AdminPanel({
   };
 
   const handleDeleteAnnouncement = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا الإعلان؟')) {
-      try {
-        await deleteDoc(doc(db, 'announcements', id));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `announcements/${id}`);
-      }
+    try {
+      await deleteDoc(doc(db, 'announcements', id));
+      setConfirmDeleteAnnouncementId(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `announcements/${id}`);
     }
   };
 
@@ -506,12 +570,54 @@ export default function AdminPanel({
   };
 
   const handleDeleteCoupon = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا الكود؟')) {
-      try {
-        await deleteDoc(doc(db, 'coupons', id));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `coupons/${id}`);
+    try {
+      await deleteDoc(doc(db, 'coupons', id));
+      setConfirmDeleteCouponId(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `coupons/${id}`);
+    }
+  };
+
+  const handleAddShipping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSubmitting(true);
+      const data = { ...newShipping, createdAt: new Date().toISOString() };
+      if (editingShippingId) {
+        await updateDoc(doc(db, 'shipping', editingShippingId), data);
+        setEditingShippingId(null);
+      } else {
+        await addDoc(collection(db, 'shipping'), data);
       }
+      setIsAddingShipping(false);
+      setNewShipping({ 
+        name: '', 
+        cost: 0, 
+        estimatedDays: '', 
+        active: true,
+        allCities: true,
+        cities: []
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'shipping');
+      alert('خطأ أثناء حفظ وسيلة الشحن');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditShipping = (opt: ShippingOption) => {
+    setNewShipping(opt);
+    setEditingShippingId(opt.id);
+    setIsAddingShipping(true);
+  };
+
+  const handleDeleteShipping = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'shipping', id));
+      setConfirmDeleteShippingId(null);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `shipping/${id}`);
     }
   };
 
@@ -534,13 +640,13 @@ export default function AdminPanel({
   };
 
   const handleDeleteOrder = async (orderId: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا الطلب نهائياً؟')) {
-      try {
-        await deleteDoc(doc(db, 'orders', orderId));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `orders/${orderId}`);
-        alert('خطأ أثناء حذف الطلب');
-      }
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+      setConfirmDeleteOrderId(null);
+      alert('تم حذف الطلب بنجاح');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `orders/${orderId}`);
+      alert('خطأ أثناء حذف الطلب');
     }
   };
 
@@ -648,6 +754,24 @@ export default function AdminPanel({
                     <div className="flex items-center gap-1.5">
                       <Ticket className="w-3.5 h-3.5" />
                       أكواد الخصم
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('shipping')}
+                    className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'shipping' ? 'bg-brand-purple text-white' : 'text-gray-400 hover:text-charcoal'}`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Truck className="w-3.5 h-3.5" />
+                      إدارة الشحن
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('invoices')}
+                    className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'invoices' ? 'bg-brand-purple text-white' : 'text-gray-400 hover:text-charcoal'}`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      إدارة الفواتير
                     </div>
                   </button>
                 </div>
@@ -944,12 +1068,19 @@ export default function AdminPanel({
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            <button 
-                              onClick={() => handleRemoveProduct(p.id)}
-                              className="p-2 text-gray-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {confirmDeleteProductId === p.id ? (
+                              <div className="flex flex-col gap-1">
+                                <button onClick={() => handleDeleteProduct(p.id)} className="bg-red-600 text-white p-1 rounded-lg text-[8px] animate-pulse">تأكيد؟</button>
+                                <button onClick={() => setConfirmDeleteProductId(null)} className="bg-gray-100 text-gray-500 p-1 rounded-lg text-[8px]">X</button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => setConfirmDeleteProductId(p.id)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1390,12 +1521,19 @@ export default function AdminPanel({
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
-                            <button 
-                              onClick={() => handleRemoveCategory(c.id)}
-                              className="p-3 bg-red-50 text-red-200 hover:text-red-500 rounded-xl transition-all"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {confirmDeleteCategoryId === c.id ? (
+                              <div className="flex flex-col gap-1">
+                                <button onClick={() => handleDeleteCategory(c.id)} className="bg-red-600 text-white p-2 rounded-xl text-[9px] font-bold animate-pulse">تأكيد؟</button>
+                                <button onClick={() => setConfirmDeleteCategoryId(null)} className="bg-gray-100 text-gray-500 p-2 rounded-xl text-[9px] font-bold">X</button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => setConfirmDeleteCategoryId(c.id)}
+                                className="p-3 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1481,48 +1619,75 @@ export default function AdminPanel({
                             className={`bg-white rounded-[32px] border transition-all overflow-hidden ${expandedOrderId === order.id ? 'border-brand-purple shadow-xl' : 'border-border-subtle hover:border-brand-purple/30'}`}
                           >
                             {/* Summary View */}
-                            <div 
-                              onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
-                              className="p-6 cursor-pointer flex flex-wrap items-center gap-6"
-                            >
-                              <div className="w-12 h-12 bg-muted-bg rounded-2xl flex items-center justify-center text-brand-purple">
-                                <Package className="w-6 h-6" />
-                              </div>
-                              <div className="flex-1 min-w-[200px]">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-bold text-sm">{order.customerName}</h4>
-                                  <span className={`text-[9px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-widest ${getStatusColor(order.status)}`}>
-                                    {getStatusLabel(order.status)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-4 text-[10px] text-gray-400 font-bold">
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{new Date(order.createdAt).toLocaleDateString('ar-SA')}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <span className="w-1 h-1 bg-gray-200 rounded-full" />
-                                    <span>{order.items.length} منتجات</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-left">
-                                <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-widest">المبلغ الإجمالي</span>
-                                <span className="text-lg font-extrabold text-charcoal">{order.total} <span className="text-[10px] font-medium text-gray-300">ر.س</span></span>
-                              </div>
-                              <div className="p-2 bg-muted-bg rounded-lg text-gray-300">
-                                {expandedOrderId === order.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                              </div>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteOrder(order.id);
-                                }}
-                                className="p-2 bg-red-50 text-red-300 hover:text-red-500 rounded-lg transition-colors"
-                                title="حذف الطلب"
+                            <div className="flex items-center pr-6 py-4">
+                              <div 
+                                onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
+                                className="flex-1 cursor-pointer flex flex-wrap items-center gap-6 p-4"
                               >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
+                                <div className="w-12 h-12 bg-muted-bg rounded-2xl flex items-center justify-center text-brand-purple">
+                                  <Package className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1 min-w-[200px]">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-bold text-sm">{order.customerName}</h4>
+                                    <span className={`text-[9px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-widest ${getStatusColor(order.status)}`}>
+                                      {getStatusLabel(order.status)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-4 text-[10px] text-gray-400 font-bold">
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      <span>{new Date(order.createdAt).toLocaleDateString('ar-SA')}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <span className="w-1 h-1 bg-gray-200 rounded-full" />
+                                      <span>{order.items.length} منتجات</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-left">
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-widest">المبلغ الإجمالي</span>
+                                  <span className="text-lg font-extrabold text-charcoal">{order.total} <span className="text-[10px] font-medium text-gray-300">ر.س</span></span>
+                                </div>
+                                <div className="p-2 bg-muted-bg rounded-lg text-gray-300">
+                                  {expandedOrderId === order.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                </div>
+                              </div>
+                              <div className="px-6 border-r border-border-subtle flex items-center gap-3">
+                                {confirmDeleteOrderId === order.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteOrder(order.id);
+                                      }}
+                                      className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 shadow-lg active:scale-95 transition-all animate-pulse"
+                                    >
+                                      تأكيد الحذف؟
+                                    </button>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setConfirmDeleteOrderId(null);
+                                      }}
+                                      className="p-2 bg-gray-100 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-200"
+                                    >
+                                      إلغاء
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConfirmDeleteOrderId(order.id);
+                                    }}
+                                    className="p-4 bg-red-50 text-red-500 hover:bg-red-100 rounded-2xl transition-all shadow-sm group active:scale-95"
+                                    title="حذف الطلب"
+                                  >
+                                    <Trash2 className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                             {/* Detailed View */}
@@ -1555,8 +1720,10 @@ export default function AdminPanel({
                                             </a>
                                           </div>
                                           <div className="flex flex-col gap-1 text-xs">
-                                            <span className="text-gray-400">العنوان:</span>
-                                            <span className="font-bold leading-relaxed">{order.address}</span>
+                                            <span className="text-gray-400">المدينة والعنوان:</span>
+                                            <span className="font-bold leading-relaxed">
+                                              {order.city && `${order.city} - `}{order.address}
+                                            </span>
                                           </div>
                                           {order.paymentMethod && (
                                             <div className="flex justify-between items-center text-xs pt-2 border-t border-dashed border-gray-100">
@@ -1601,6 +1768,21 @@ export default function AdminPanel({
                                           </a>
                                         </div>
                                       </div>
+
+                                      <div className="pt-4 border-t border-dashed border-gray-100">
+                                        <button
+                                          onClick={() => handleDownloadInvoice(order)}
+                                          disabled={isGeneratingInvoice === order.id}
+                                          className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-border-subtle hover:border-brand-purple hover:text-brand-purple rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                        >
+                                          {isGeneratingInvoice === order.id ? (
+                                            <Clock className="w-4 h-4 animate-spin" />
+                                          ) : (
+                                            <Download className="w-4 h-4" />
+                                          )}
+                                          <span>تحميل الفاتورة الضريبية (PDF)</span>
+                                        </button>
+                                      </div>
                                     </div>
 
                                     {/* Right: Items */}
@@ -1623,8 +1805,14 @@ export default function AdminPanel({
                                             </div>
                                           </div>
                                         ))}
+                                        {order.shippingCost && (
+                                          <div className="p-4 flex justify-between items-center text-xs border-t border-border-subtle bg-white">
+                                            <span className="text-gray-400 font-bold">الشحن ({order.shippingType}):</span>
+                                            <span className="font-bold">{order.shippingCost} ر.س</span>
+                                          </div>
+                                        )}
                                         <div className="p-4 bg-muted-bg/50 flex justify-between items-center text-sm">
-                                          <span className="font-bold">المجموع:</span>
+                                          <span className="font-bold">المجموع النهائي:</span>
                                           <span className="font-extrabold text-brand-purple">{order.total} ر.س</span>
                                         </div>
                                       </div>
@@ -1749,12 +1937,19 @@ export default function AdminPanel({
                                 >
                                   <Edit2 className="w-4 h-4" />
                                 </button>
-                                <button 
-                                  onClick={() => handleRemoveTestimonial(t.id)}
-                                  className="p-2 bg-red-50 text-red-200 hover:text-red-500 rounded-xl transition-all"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                {confirmDeleteTestimonialId === t.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => handleDeleteTestimonial(t.id)} className="bg-red-600 text-white px-2 py-1 rounded-lg text-[8px] animate-pulse">تأكيد؟</button>
+                                    <button onClick={() => setConfirmDeleteTestimonialId(null)} className="bg-gray-100 text-gray-500 px-2 py-1 rounded-lg text-[8px]">X</button>
+                                  </div>
+                                ) : (
+                                  <button 
+                                    onClick={() => setConfirmDeleteTestimonialId(t.id)}
+                                    className="p-2 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl transition-all"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             </div>
                             <p className="text-xs text-charcoal/80 italic mb-6 leading-relaxed">"{t.content}"</p>
@@ -2131,12 +2326,19 @@ export default function AdminPanel({
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
-                              <button 
-                                onClick={() => handleDeleteAnnouncement(ann.id)}
-                                className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {confirmDeleteAnnouncementId === ann.id ? (
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => handleDeleteAnnouncement(ann.id)} className="bg-red-600 text-white px-2 py-1 rounded-lg text-[8px] animate-pulse">تأكيد؟</button>
+                                  <button onClick={() => setConfirmDeleteAnnouncementId(null)} className="bg-gray-100 text-gray-500 px-2 py-1 rounded-lg text-[8px]">X</button>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={() => setConfirmDeleteAnnouncementId(ann.id)}
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                               <button 
                                 onClick={async () => {
                                   await updateDoc(doc(db, 'announcements', ann.id), { active: !ann.active });
@@ -2290,9 +2492,16 @@ export default function AdminPanel({
                                 <button onClick={() => handleEditCoupon(coupon)} className="p-2 text-gray-400 hover:text-brand-purple transition-colors">
                                   <Edit2 className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => handleDeleteCoupon(coupon.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                {confirmDeleteCouponId === coupon.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => handleDeleteCoupon(coupon.id)} className="bg-red-600 text-white px-2 py-1 rounded-lg text-[8px] animate-pulse">تأكيد؟</button>
+                                    <button onClick={() => setConfirmDeleteCouponId(null)} className="bg-gray-100 text-gray-500 px-2 py-1 rounded-lg text-[8px]">X</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => setConfirmDeleteCouponId(coupon.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             </div>
                             
@@ -2320,6 +2529,380 @@ export default function AdminPanel({
                           <p className="text-gray-400 font-bold">لا يوجد أكواد خصم حالياً</p>
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'shipping' && (
+                  <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-brand-purple/10 rounded-2xl flex items-center justify-center text-brand-purple">
+                          <Truck className="w-8 h-8" />
+                        </div>
+                        <div className="flex flex-col">
+                          <h3 className="text-2xl font-black tracking-tighter">إدارة وسائل الشحن</h3>
+                          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">تحكم في خيارات الشحن وتكاليفها</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setNewShipping({ 
+                            name: '', 
+                            cost: 0, 
+                            estimatedDays: '', 
+                            active: true,
+                            allCities: true,
+                            cities: []
+                          });
+                          setEditingShippingId(null);
+                          setIsAddingShipping(true);
+                        }}
+                        className="px-8 py-4 bg-brand-purple text-white rounded-2xl font-black text-xs hover:bg-brand-purple-dark transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-purple/20 active:scale-95"
+                      >
+                        <Plus className="w-4 h-4" />
+                        إضافة وسيلة شحن
+                      </button>
+                    </div>
+
+                    <div className="bg-white rounded-[40px] border border-border-subtle p-8 shadow-sm">
+                      <AnimatePresence>
+                        {isAddingShipping && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-8">
+                            <form onSubmit={handleAddShipping} className="bg-muted-bg/30 p-8 rounded-[32px] border border-border-subtle space-y-6">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">اسم وسيلة الشحن</label>
+                                  <input 
+                                    type="text" 
+                                    value={newShipping.name}
+                                    onChange={(e) => setNewShipping({ ...newShipping, name: e.target.value })}
+                                    className="w-full bg-white border border-border-subtle px-6 py-4 rounded-2xl outline-none focus:border-brand-purple transition-all text-sm font-bold"
+                                    placeholder="مثلاً: سمسا، أرامكس، استلام من الفرع"
+                                    required
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">تكلفة الشحن (ر.س)</label>
+                                  <input 
+                                    type="number" 
+                                    value={newShipping.cost}
+                                    onChange={(e) => setNewShipping({ ...newShipping, cost: Number(e.target.value) })}
+                                    className="w-full bg-white border border-border-subtle px-6 py-4 rounded-2xl outline-none focus:border-brand-purple transition-all text-sm font-bold"
+                                    required
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">مدة التوصيل المتوقعة</label>
+                                  <input 
+                                    type="text" 
+                                    value={newShipping.estimatedDays}
+                                    onChange={(e) => setNewShipping({ ...newShipping, estimatedDays: e.target.value })}
+                                    className="w-full bg-white border border-border-subtle px-6 py-4 rounded-2xl outline-none focus:border-brand-purple transition-all text-sm font-bold"
+                                    placeholder="مثلاً: يومين - 4 أيام"
+                                    required
+                                  />
+                                </div>
+                                <div className="flex items-center gap-4 px-1 h-full pt-6">
+                                  <label className="text-sm font-bold text-gray-500">حالة التفعيل:</label>
+                                  <button 
+                                    type="button"
+                                    onClick={() => setNewShipping({ ...newShipping, active: !newShipping.active })}
+                                    className={`px-6 py-2 rounded-xl text-xs font-bold border transition-all ${newShipping.active ? 'bg-green-50 border-green-200 text-green-600' : 'bg-red-50 border-red-200 text-red-600'}`}
+                                  >
+                                    {newShipping.active ? 'مفعل' : 'معطل'}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-4 pt-4 border-t border-border-subtle">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-black text-charcoal uppercase tracking-widest">تغطية المدن</label>
+                                  <div className="flex items-center gap-2">
+                                    <button 
+                                      type="button"
+                                      onClick={() => setNewShipping({ ...newShipping, allCities: true, cities: [] })}
+                                      className={`px-4 py-2 rounded-xl text-[10px] font-bold border transition-all ${newShipping.allCities ? 'bg-brand-purple text-white border-brand-purple' : 'bg-white text-gray-400 border-border-subtle'}`}
+                                    >
+                                      كل المدن
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => setNewShipping({ ...newShipping, allCities: false })}
+                                      className={`px-4 py-2 rounded-xl text-[10px] font-bold border transition-all ${!newShipping.allCities ? 'bg-brand-purple text-white border-brand-purple' : 'bg-white text-gray-400 border-border-subtle'}`}
+                                    >
+                                      مدن محددة
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {!newShipping.allCities && (
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 max-h-48 overflow-y-auto p-4 bg-white rounded-2xl border border-border-subtle">
+                                    {SAUDI_CITIES.map(city => (
+                                      <button
+                                        key={city}
+                                        type="button"
+                                        onClick={() => {
+                                          const currentCities = newShipping.cities || [];
+                                          if (currentCities.includes(city)) {
+                                            setNewShipping({ ...newShipping, cities: currentCities.filter(c => c !== city) });
+                                          } else {
+                                            setNewShipping({ ...newShipping, cities: [...currentCities, city] });
+                                          }
+                                        }}
+                                        className={`px-3 py-2 rounded-lg text-[10px] font-bold border transition-all ${newShipping.cities?.includes(city) ? 'bg-brand-purple/10 border-brand-purple text-brand-purple' : 'bg-gray-50 border-transparent text-gray-500 hover:border-gray-200'}`}
+                                      >
+                                        {city}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex gap-4 pt-4">
+                                <button type="submit" disabled={isSubmitting} className="flex-1 bg-brand-purple text-white py-4 rounded-2xl font-black text-xs hover:bg-brand-purple-dark transition-all shadow-lg shadow-brand-purple/20 disabled:opacity-50">
+                                  {isSubmitting ? 'جاري الحفظ...' : (editingShippingId ? 'تحديث الوسيلة' : 'إضافة وسيلة الشحن')}
+                                </button>
+                                <button type="button" onClick={() => setIsAddingShipping(false)} className="flex-1 bg-white text-gray-400 py-4 rounded-2xl font-black text-xs border border-border-subtle hover:bg-gray-50 transition-all">
+                                  إلغاء
+                                </button>
+                              </div>
+                            </form>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {shippingOptions.map((opt) => (
+                          <div key={opt.id} className="bg-muted-bg/30 p-6 rounded-[32px] border border-border-subtle space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-3 bg-brand-purple/10 text-brand-purple rounded-2xl">
+                                  <Truck className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <h5 className="font-black text-md tracking-tighter">{opt.name}</h5>
+                                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                    {opt.cost === 0 ? 'شحن مجاني' : `${opt.cost} ر.س`}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => handleEditShipping(opt)} className="p-2 text-gray-400 hover:text-brand-purple transition-colors">
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleDeleteShipping(opt.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
+                              <div className="bg-white/50 p-2 rounded-xl border border-border-subtle flex flex-col">
+                                <span className="text-gray-400 uppercase tracking-widest">التوصيل</span>
+                                <span>{opt.estimatedDays}</span>
+                              </div>
+                              <div className="bg-white/50 p-2 rounded-xl border border-border-subtle flex flex-col">
+                                <span className="text-gray-400 uppercase tracking-widest">المدن</span>
+                                <span>{opt.allCities ? 'كل المدن' : `${opt.cities?.length || 0} مدينة`}</span>
+                              </div>
+                              <div className="bg-white/50 p-2 rounded-xl border border-border-subtle flex flex-col col-span-2">
+                                <span className="text-gray-400 uppercase tracking-widest">الحالة</span>
+                                <span className={opt.active ? 'text-green-500' : 'text-red-500'}>
+                                  {opt.active ? 'نشط' : 'متوقف'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {shippingOptions.length === 0 && !isAddingShipping && (
+                        <div className="py-20 text-center space-y-4">
+                          <div className="w-20 h-20 bg-muted-bg rounded-full flex items-center justify-center mx-auto">
+                            <Truck className="w-10 h-10 text-gray-300" />
+                          </div>
+                          <p className="text-gray-400 font-bold">لا يوجد خيارات شحن حالياً</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'invoices' && (
+                  <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-brand-purple/10 rounded-2xl flex items-center justify-center text-brand-purple">
+                        <ExternalLink className="w-8 h-8" />
+                      </div>
+                      <div className="flex flex-col">
+                        <h3 className="text-2xl font-black tracking-tighter">إدارة الفواتير</h3>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">قم بتخصيص مظهر وبيانات الفاتورة التي تصل للعملاء</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-[40px] border border-border-subtle shadow-sm space-y-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Store Info */}
+                        <div className="space-y-6">
+                          <h4 className="text-[10px] font-black text-brand-purple uppercase tracking-widest border-b border-brand-purple/10 pb-2">بيانات المتجر</h4>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">اسم المتجر</label>
+                              <input 
+                                type="text"
+                                value={invoiceConfig.storeName}
+                                onChange={(e) => setInvoiceConfig({ ...invoiceConfig, storeName: e.target.value })}
+                                className="w-full bg-muted-bg border-none rounded-2xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-brand-purple"
+                                placeholder="مثلاً: مؤسسة علم الحياة"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">الرقم الضريبي</label>
+                              <input 
+                                type="text"
+                                value={invoiceConfig.taxNumber}
+                                onChange={(e) => setInvoiceConfig({ ...invoiceConfig, taxNumber: e.target.value })}
+                                className="w-full bg-muted-bg border-none rounded-2xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-brand-purple"
+                                placeholder="15 خانة ضريبية"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">العنوان</label>
+                              <input 
+                                type="text"
+                                value={invoiceConfig.storeAddress}
+                                onChange={(e) => setInvoiceConfig({ ...invoiceConfig, storeAddress: e.target.value })}
+                                className="w-full bg-muted-bg border-none rounded-2xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-brand-purple"
+                                placeholder="الرياض، المملكة العربية السعودية"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Contact Info */}
+                        <div className="space-y-6">
+                          <h4 className="text-[10px] font-black text-brand-purple uppercase tracking-widest border-b border-brand-purple/10 pb-2">بيانات التواصل</h4>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">رقم الجوال</label>
+                              <input 
+                                type="text"
+                                value={invoiceConfig.phone}
+                                onChange={(e) => setInvoiceConfig({ ...invoiceConfig, phone: e.target.value })}
+                                className="w-full bg-muted-bg border-none rounded-2xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-brand-purple"
+                                placeholder="9665XXXXXXXX"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">البريد الإلكتروني</label>
+                              <input 
+                                type="email"
+                                value={invoiceConfig.email}
+                                onChange={(e) => setInvoiceConfig({ ...invoiceConfig, email: e.target.value })}
+                                className="w-full bg-muted-bg border-none rounded-2xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-brand-purple"
+                                placeholder="info@store.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">نسبة ضريبة القيمة المضافة (%)</label>
+                              <div className="flex gap-4 items-center">
+                                <input 
+                                  type="number"
+                                  value={invoiceConfig.vatRate}
+                                  onChange={(e) => setInvoiceConfig({ ...invoiceConfig, vatRate: Number(e.target.value) })}
+                                  disabled={!invoiceConfig.isTaxEnabled}
+                                  className={`flex-1 bg-muted-bg border-none rounded-2xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-brand-purple ${!invoiceConfig.isTaxEnabled ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                                />
+                                <button
+                                  onClick={() => setInvoiceConfig({ ...invoiceConfig, isTaxEnabled: !invoiceConfig.isTaxEnabled })}
+                                  className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${invoiceConfig.isTaxEnabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}
+                                >
+                                  {invoiceConfig.isTaxEnabled ? 'مفعلة' : 'معطلة'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Appearance */}
+                      <div className="space-y-6">
+                        <h4 className="text-[10px] font-black text-brand-purple uppercase tracking-widest border-b border-brand-purple/10 pb-2">المظهر والرسائل</h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">شعار الفاتورة</label>
+                            <div className="flex gap-4 items-start">
+                              <div className="w-20 h-20 bg-muted-bg rounded-2xl border-2 border-dashed border-border-subtle flex items-center justify-center overflow-hidden shrink-0">
+                                {invoiceConfig.logoUrl ? (
+                                  <img src={invoiceConfig.logoUrl} alt="Logo Preview" className="w-full h-full object-contain" />
+                                ) : (
+                                  <ImageIcon className="w-6 h-6 text-gray-300" />
+                                )}
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <input 
+                                  type="text" 
+                                  value={invoiceConfig.logoUrl}
+                                  onChange={(e) => setInvoiceConfig({ ...invoiceConfig, logoUrl: e.target.value })}
+                                  className="w-full bg-muted-bg border-none rounded-2xl px-4 py-2 text-[10px] font-bold"
+                                  placeholder="رابط الشعار المباشر"
+                                />
+                                <div className="flex gap-2">
+                                  <label className="flex-1 bg-white border border-border-subtle hover:border-brand-purple text-[10px] font-black px-4 py-2 rounded-xl text-center cursor-pointer transition-all">
+                                    رفع صورة
+                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, (url) => setInvoiceConfig({ ...invoiceConfig, logoUrl: url }), 1)} />
+                                  </label>
+                                  <button onClick={() => handleUrlImageEdit(invoiceConfig.logoUrl, (url) => setInvoiceConfig({ ...invoiceConfig, logoUrl: url }), 1)} className="p-2 bg-white border border-border-subtle rounded-xl hover:text-brand-purple">
+                                    <Palette className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">رسالة تذييل الفاتورة</label>
+                            <textarea 
+                              value={invoiceConfig.footerMessage}
+                              onChange={(e) => setInvoiceConfig({ ...invoiceConfig, footerMessage: e.target.value })}
+                              className="w-full bg-muted-bg border-none rounded-2xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-brand-purple h-24"
+                              placeholder="رسالة تظهر في أسفل الفاتورة..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-8 border-t border-border-subtle">
+                        <button 
+                          onClick={handleSaveInvoiceConfig}
+                          disabled={isSubmitting}
+                          className="w-full bg-brand-purple text-white py-4 rounded-2xl font-black text-xs hover:bg-brand-purple-dark transition-all shadow-lg shadow-brand-purple/20 flex items-center justify-center gap-2"
+                        >
+                          {isSubmitting ? (
+                            <Clock className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          حفظ جميع إعدادات الفاتورة
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Preview Hint */}
+                    <div className="p-6 bg-brand-teal/5 border border-brand-teal/10 rounded-3xl flex items-start gap-4">
+                      <div className="p-2 bg-brand-teal text-white rounded-xl">
+                        <Star className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-black text-brand-teal">نصيحة احترافية</h4>
+                        <p className="text-[10px] font-bold text-gray-500 leading-relaxed">
+                          الفواتير يتم إنشاؤها تلقائياً لكل طلب مدفوع. تأكد من صحة الرقم الضريبي والعنوان لتكون الفاتورة متوافقة مع متطلبات هيئة الزكاة والضريبة والجمارك.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}

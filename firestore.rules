@@ -94,6 +94,25 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    function isValidShipping(data) {
+      return data.keys().hasAll(['name', 'cost', 'estimatedDays', 'active', 'allCities', 'cities', 'createdAt']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.cost is number &&
+             data.estimatedDays is string && data.estimatedDays.size() <= 50 &&
+             data.active is bool &&
+             data.allCities is bool &&
+             data.cities is list && data.cities.size() <= 50 &&
+             data.createdAt is string;
+    }
+
+    // --- Shipping ---
+    match /shipping/{shippingId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidShipping(request.resource.data);
+      allow update: if isAdmin() && isValidShipping(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
     // --- Announcements ---
     match /announcements/{announcementId} {
       allow read: if true;

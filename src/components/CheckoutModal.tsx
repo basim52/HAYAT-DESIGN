@@ -1,12 +1,13 @@
-import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon, Scissors, Ticket, Tag } from 'lucide-react';
+import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon, Scissors, Ticket, Tag, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, FormEvent, useEffect, ChangeEvent } from 'react';
-import { BANK_DETAILS, PAYMENT_METHODS } from '../constants';
+import { BANK_DETAILS, PAYMENT_METHODS, SAUDI_CITIES } from '../constants';
 import { CartItem, UserProfile, Coupon } from '../types';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs, query, where, updateDoc, doc, increment } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, updateDoc, doc, increment, onSnapshot, orderBy } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import ImageEditorModal from './ImageEditorModal';
+import { ShippingOption } from '../types';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -20,15 +21,45 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
   const [formData, setFormData] = useState({
     customerName: '',
     phone: '',
+    city: '',
     address: '',
     shortAddress: '',
   });
+
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
+  const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const q = query(collection(db, 'shipping'), where('active', '==', true), orderBy('cost', 'asc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const options = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShippingOption));
+      setShippingOptions(options);
+      if (options.length > 0 && !selectedShippingId) {
+        setSelectedShippingId(options[0].id);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'shipping'));
+    return () => unsub();
+  }, [isOpen]);
+
+  const sortedCities = [...SAUDI_CITIES].sort((a, b) => a.localeCompare(b, 'ar'));
+
+  const availableShipping = shippingOptions.filter(opt => 
+    opt.allCities || (formData.city && opt.cities?.includes(formData.city))
+  );
+
+  useEffect(() => {
+    if (availableShipping.length > 0 && !availableShipping.find(opt => opt.id === selectedShippingId)) {
+      setSelectedShippingId(availableShipping[0].id);
+    }
+  }, [availableShipping, selectedShippingId]);
 
   useEffect(() => {
     if (userProfile) {
       setFormData({
         customerName: userProfile.fullName || '',
         phone: userProfile.phone || '',
+        city: userProfile.city || '',
         address: userProfile.address || '',
         shortAddress: userProfile.shortAddress || '',
       });
@@ -53,13 +84,18 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   
+  // Shipping logic
+  const selectedShipping = shippingOptions.find(opt => opt.id === selectedShippingId);
+  const shippingCost = selectedShipping?.cost || 0;
+  const shippingType = selectedShipping?.name || 'لم يتم الاختيار';
+
   const discountAmount = appliedCoupon ? (
     appliedCoupon.type === 'percentage' 
       ? (subtotal * appliedCoupon.value / 100)
       : appliedCoupon.value
   ) : 0;
 
-  const finalTotal = Math.max(0, subtotal - discountAmount);
+  const finalTotal = Math.max(0, subtotal + shippingCost - discountAmount);
 
   const handleValidateCoupon = async () => {
     if (!couponInput) return;
@@ -119,12 +155,20 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
       alert('يرجى إدخال رقم جوال سعودي صحيح (مثال: 05xxxxxxx)');
       return;
     }
+    if (!formData.city) {
+      alert('يرجى اختيار مدينة التوصيل');
+      return;
+    }
     if (!formData.address.trim()) {
       alert('يرجى إدخال عنوان التوصيل / الاستلام');
       return;
     }
     if (!formData.shortAddress.trim()) {
       alert('يرجى إدخال العنوان الوطني المختصر (مثال: AB1234)');
+      return;
+    }
+    if (!selectedShippingId || availableShipping.length === 0) {
+      alert('عذراً، يرجى اختيار وسيلة شحن متوفرة لمدينتك لإتمام الطلب');
       return;
     }
     if (!receiptImage) {
@@ -148,6 +192,8 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
           image: item.image
         })),
         subtotal,
+        shippingCost,
+        shippingType,
         discount: discountAmount,
         couponCode: appliedCoupon?.code || null,
         total: finalTotal,
@@ -174,11 +220,13 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
         `*بيانات العميل:*\n` +
         `الاسم: ${formData.customerName}\n` +
         `رقم الجوال: ${formData.phone}\n` +
+        `المدينة: ${formData.city}\n` +
         `العنوان: ${formData.address}\n` +
         (formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : '') +
         `\n*تفاصيل الطلب:*\n${itemsList}\n\n` +
         `*ملخص الحساب:*\n` +
         `المجموع الفرعي: ${subtotal} ر.س\n` +
+        `الشحن (${shippingType}): ${shippingCost} ر.س\n` +
         (appliedCoupon ? `الخصم (${appliedCoupon.code}): -${discountAmount} ر.س\n` : '') +
         `*طريقة الدفع:* ${selectedMethod.bankName}\n` +
         `*الإجمالي النهائي:* ${finalTotal} ر.س\n\n` +
@@ -188,7 +236,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
       const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
       
       const subject = `طلب جديد - ${formData.customerName}`;
-      const emailBody = `الاسم: ${formData.customerName}\nالجوال: ${formData.phone}\nالعنوان: ${formData.address}\n${formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : ''}\nتفاصيل الطلب:\n${cartItems.map(i => `${i.name} x${i.quantity}`).join('\n')}\n\nالإجمالي: ${finalTotal} ر.س`;
+      const emailBody = `الاسم: ${formData.customerName}\nالجوال: ${formData.phone}\nالمدينة: ${formData.city}\nالعنوان: ${formData.address}\n${formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : ''}\n\nالشحن: ${shippingType} (${shippingCost} ر.س)\nتفاصيل الطلب:\n${cartItems.map(i => `${i.name} x${i.quantity}`).join('\n')}\n\nالإجمالي النهائي: ${finalTotal} ر.س`;
       const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
 
       setOrderUrls({ whatsappUrl, mailtoUrl });
@@ -438,20 +486,42 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                     </div>
 
                     {/* Summary */}
-                    <div className="p-6 bg-muted-bg/50 rounded-3xl space-y-3">
-                      <div className="flex justify-between text-xs font-bold text-gray-500">
-                        <span>المجموع الفرعي</span>
-                        <span>{subtotal} ر.س</span>
-                      </div>
-                      {appliedCoupon && (
-                        <div className="flex justify-between text-xs font-bold text-green-600">
-                          <span>الخصم ({appliedCoupon.code})</span>
-                          <span>-{discountAmount} ر.س</span>
+                    <div className="p-6 bg-muted-bg/50 rounded-3xl space-y-4 border border-border-subtle/50">
+                      <div className="flex justify-between text-[11px] font-bold text-gray-400 uppercase tracking-widest px-1">ملخص الفاتورة</div>
+                      
+                      <div className="space-y-2.5">
+                        <div className="flex justify-between text-xs font-bold text-charcoal">
+                          <span className="text-gray-500">مجموع المنتجات</span>
+                          <span>{subtotal} ر.س</span>
                         </div>
-                      )}
-                      <div className="flex justify-between text-lg font-black border-t border-border-subtle pt-3">
-                        <span>الإجمالي النهائي</span>
-                        <span className="text-brand-purple">{finalTotal} ر.س</span>
+                        
+                        {selectedShipping && (
+                          <div className="flex justify-between text-xs font-bold items-center py-2 px-3 bg-brand-teal/5 rounded-xl border border-brand-teal/10">
+                            <div className="flex items-center gap-2">
+                              <Truck className="w-3 h-3 text-brand-teal" />
+                              <span className="text-brand-teal">الشحن: {selectedShipping.name}</span>
+                            </div>
+                            <span className="text-brand-teal">{shippingCost === 0 ? 'مجاني' : `${shippingCost} ر.س`}</span>
+                          </div>
+                        )}
+
+                        {appliedCoupon && (
+                          <div className="flex justify-between text-xs font-bold text-green-600 px-1">
+                            <div className="flex items-center gap-2">
+                              <Tag className="w-3 h-3" />
+                              <span>خصم ({appliedCoupon.code})</span>
+                            </div>
+                            <span>-{discountAmount} ر.س</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-center text-lg font-black border-t border-border-subtle pt-4 px-1">
+                        <span className="text-charcoal">الإجمالي النهائي</span>
+                        <div className="text-left">
+                          <span className="text-brand-purple text-2xl">{finalTotal}</span>
+                          <span className="text-[10px] text-brand-purple mr-1">ر.س</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -471,7 +541,9 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                               <div className="space-y-0.5">
                                 <p className="text-sm font-black">{userProfile.fullName}</p>
                                 <p className="text-[11px] text-gray-500 font-bold">{userProfile.phone}</p>
-                                <p className="text-[11px] text-gray-500 leading-relaxed">{userProfile.address || 'لا يوجد عنوان مسجل'}</p>
+                                <p className="text-[11px] text-gray-500 leading-relaxed font-bold">
+                                  {userProfile.city && `${userProfile.city} - `}{userProfile.address || 'لا يوجد عنوان مسجل'}
+                                </p>
                                 {userProfile.shortAddress && (
                                   <p className="text-[10px] text-brand-teal font-black mt-2 inline-block px-2 py-1 bg-brand-teal/10 rounded-lg">العنوان المختصر: {userProfile.shortAddress}</p>
                                 )}
@@ -533,15 +605,34 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                             />
                           </div>
 
+                          {/* City */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center px-1">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">المدينة</label>
+                              <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                            </div>
+                            <select
+                              required
+                              className="w-full px-5 py-4 bg-muted-bg/30 border border-brand-purple/10 rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple transition-all text-sm font-bold appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22%237c3aed%22%20stroke-width%3D%222%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20d%3D%22m19%209-7%207-7-7%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_1.25rem_center] bg-no-repeat"
+                              value={formData.city}
+                              onChange={e => setFormData({ ...formData, city: e.target.value })}
+                            >
+                              <option value="">اختر المدينة</option>
+                              {sortedCities.map(city => (
+                                <option key={city} value={city}>{city}</option>
+                              ))}
+                            </select>
+                          </div>
+
                           {/* Address */}
                           <div className="space-y-1.5">
                             <div className="flex justify-between items-center px-1">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">عنوان التوصيل (المدينة والحي)</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">عنوان التوصيل (الحي والشارع)</label>
                               <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
                             </div>
                             <textarea
                               required
-                              placeholder="المدينة، الحي، اسم الشارع، تفاصيل أخرى"
+                              placeholder="اسم الحي، اسم الشارع، تفاصيل أخرى"
                               rows={2}
                               className="w-full px-5 py-4 bg-muted-bg/30 border border-brand-purple/10 rounded-3xl focus:outline-none focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple transition-all resize-none text-sm font-bold"
                               value={formData.address}
@@ -566,6 +657,45 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           </div>
                         </>
                       )}
+
+                      {/* Shipping Methods */}
+                      <div className="space-y-2">
+                         <div className="flex justify-between items-center px-1">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">طريقة الشحن المتوفرة لمدينتك</label>
+                          <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                          {availableShipping.length > 0 ? (
+                            availableShipping.map((opt) => (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setSelectedShippingId(opt.id)}
+                                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${selectedShippingId === opt.id ? 'bg-brand-purple/5 border-brand-purple ring-1 ring-brand-purple' : 'bg-white border-border-subtle hover:border-gray-300'}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-xl ${selectedShippingId === opt.id ? 'bg-brand-purple text-white' : 'bg-muted-bg text-gray-400'}`}>
+                                    <Truck className="w-4 h-4" />
+                                  </div>
+                                  <div className="text-right">
+                                    <p className={`text-xs font-black ${selectedShippingId === opt.id ? 'text-brand-purple' : 'text-charcoal'}`}>{opt.name}</p>
+                                    <p className="text-[10px] text-gray-400 font-bold">{opt.estimatedDays}</p>
+                                  </div>
+                                </div>
+                                <span className={`text-xs font-black ${selectedShippingId === opt.id ? 'text-brand-purple' : 'text-charcoal'}`}>
+                                  {opt.cost === 0 ? 'مجاني' : `${opt.cost} ر.س`}
+                                </span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-4 bg-red-50 border border-dashed border-red-200 rounded-2xl text-center">
+                              <p className="text-[10px] text-red-500 font-bold">
+                                {formData.city ? 'عذراً، لا توجد وسيلة شحن متوفرة لهذه المدينة حالياً' : 'يرجى اختيار المدينة أولاً لإظهار خيارات الشحن'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
                       {/* Receipt Upload */}
                       <div className="space-y-1.5">
