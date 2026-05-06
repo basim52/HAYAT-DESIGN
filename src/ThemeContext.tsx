@@ -43,7 +43,9 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [configs, setConfigs] = useState<PlatformConfigs>(defaultConfigs);
   const [previewConfig, setPreviewConfig] = useState<{ platform: 'web' | 'mobile', config: ThemeConfig } | null>(null);
-  const [isMobileView, setIsMobileView] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(
+    typeof window !== 'undefined' ? (window.innerWidth < 768) : false
+  );
   const [adminForcePlatform, setAdminForcePlatform] = useState<'web' | 'mobile' | null>(null);
 
   useEffect(() => {

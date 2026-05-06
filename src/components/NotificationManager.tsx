@@ -38,7 +38,9 @@ interface NotificationManagerProps {
 export default function NotificationManager({ cartCount, onOpenCart }: NotificationManagerProps) {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [showToast, setShowToast] = useState(false);
-  const [currentPlatform, setCurrentPlatform] = useState<'web' | 'mobile'>('web');
+  const [currentPlatform, setCurrentPlatform] = useState<'web' | 'mobile'>(
+    typeof window !== 'undefined' ? (window.innerWidth <= 768 ? 'mobile' : 'web') : 'web'
+  );
   const [toastData, setToastData] = useState({ 
     title: '', 
     message: '', 
@@ -56,9 +58,12 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
   // Platform detection
   useEffect(() => {
     const checkPlatform = () => {
-      setCurrentPlatform(window.innerWidth <= 768 ? 'mobile' : 'web');
+      const isMobile = window.innerWidth <= 768;
+      setCurrentPlatform(prev => {
+        const next = isMobile ? 'mobile' : 'web';
+        return prev === next ? prev : next;
+      });
     };
-    checkPlatform();
     window.addEventListener('resize', checkPlatform);
     return () => window.removeEventListener('resize', checkPlatform);
   }, []);
