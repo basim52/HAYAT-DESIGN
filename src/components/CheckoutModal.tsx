@@ -1,13 +1,14 @@
-import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon, Scissors, Ticket, Tag, Truck } from 'lucide-react';
+import { X, Send, Landmark, Copy, CheckCircle2, MessageCircle, Mail, Smartphone, Image as ImageIcon, Scissors, Ticket, Tag, Truck, Download, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, FormEvent, useEffect, ChangeEvent } from 'react';
 import { BANK_DETAILS, PAYMENT_METHODS, SAUDI_CITIES } from '../constants';
-import { CartItem, UserProfile, Coupon } from '../types';
+import { CartItem, UserProfile, Coupon, InvoiceConfig, Order } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc, getDocs, query, where, updateDoc, doc, increment, onSnapshot, orderBy } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import ImageEditorModal from './ImageEditorModal';
 import { ShippingOption } from '../types';
+import { generateInvoicePDF } from '../lib/invoiceHelper';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -28,18 +29,34 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
 
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
+  const [invoiceConfig, setInvoiceConfig] = useState<InvoiceConfig | null>(null);
+  const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
+    
+    // Fetch shipping
     const q = query(collection(db, 'shipping'), where('active', '==', true), orderBy('cost', 'asc'));
-    const unsub = onSnapshot(q, (snapshot) => {
+    const unsubShipping = onSnapshot(q, (snapshot) => {
       const options = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShippingOption));
       setShippingOptions(options);
       if (options.length > 0 && !selectedShippingId) {
         setSelectedShippingId(options[0].id);
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'shipping'));
-    return () => unsub();
+
+    // Fetch Invoice Config
+    const unsubConfig = onSnapshot(doc(db, 'config', 'invoice'), (docSnap) => {
+      if (docSnap.exists()) {
+        setInvoiceConfig(docSnap.data() as InvoiceConfig);
+      }
+    });
+
+    return () => {
+      unsubShipping();
+      unsubConfig();
+    };
   }, [isOpen]);
 
   const sortedCities = [...SAUDI_CITIES].sort((a, b) => a.localeCompare(b, 'ar'));
@@ -180,7 +197,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
     
     try {
       // Save to Firestore
-      const orderData = {
+      const orderData: any = {
         userId: userProfile?.id || 'guest',
         ...formData,
         items: cartItems.map(item => ({
@@ -203,7 +220,9 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
         createdAt: new Date().toISOString()
       };
       
-      await addDoc(collection(db, 'orders'), orderData);
+      const docRef = await addDoc(collection(db, 'orders'), orderData);
+      orderData.id = docRef.id;
+      setLastPlacedOrder(orderData as Order);
 
       // Increment coupon usage count if used
       if (appliedCoupon) {
@@ -302,12 +321,34 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                 </div>
                 <h2 className="text-3xl font-bold">تم تسجيل طلبك!</h2>
                 <p className="text-gray-500 max-w-sm mx-auto">
-                  لقد حفظنا بيانات طلبك في النظام بجاح. يرجى إتمام الإرسال عبر إحدى الوسائل التالية لتأكيد الدفع:
+                  لقد حفظنا بيانات طلبك في النظام بنجاح. يرجى إتمام الإرسال لتأكيد الطلب والحصول على الفاتورة:
                 </p>
                 <div className="flex flex-col gap-3 max-w-xs mx-auto">
-                  {orderUrls && (
+                  {lastPlacedOrder && invoiceConfig && (
+                    <div className="space-y-2 mb-4">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إدارة الفاتورة</p>
+                      <button
+                        onClick={async () => {
+                          setIsGeneratingInvoice(true);
+                          try {
+                            await generateInvoicePDF(lastPlacedOrder, invoiceConfig);
+                          } finally {
+                            setIsGeneratingInvoice(false);
+                          }
+                        }}
+                        disabled={isGeneratingInvoice}
+                        className="flex items-center justify-center gap-2 px-6 py-4 bg-white border border-brand-purple text-brand-purple rounded-2xl font-bold hover:bg-brand-purple/5 transition-colors shadow-sm w-full"
+                      >
+                        {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                        <span>تحميل فاتورتك (PDF)</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {orderUrls && lastPlacedOrder && (
                     <>
-                      {preferredMethod === 'whatsapp' ? (
+                      <div className="space-y-3">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">مشاركة الطلب (للمتجر)</p>
                         <a 
                           href={orderUrls.whatsappUrl}
                           target="_blank"
@@ -315,30 +356,28 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-600/20"
                         >
                           <MessageCircle className="w-5 h-5" />
-                          إرسال عبر واتساب
+                          إرسال للمتجر (واتساب)
                         </a>
-                      ) : (
-                        <div className="space-y-3">
-                          <a 
-                            href={orderUrls.mailtoUrl}
-                            className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-purple text-white rounded-2xl font-bold hover:bg-brand-purple/90 transition-colors shadow-lg shadow-brand-purple/20 w-full"
-                          >
-                            <Mail className="w-5 h-5" />
-                            فتح تطبيق البريد
-                          </a>
-                          <button 
-                            onClick={() => {
-                              const body = decodeURIComponent(orderUrls.mailtoUrl.split('body=')[1] || '');
-                              handleCopyValue(body);
-                              alert('تم نسخ تفاصيل الطلب! يمكنك الآن لصقها في إيميل يدوي إذا لم يفتح التطبيق تلقائياً');
-                            }}
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-muted-bg text-charcoal rounded-2xl font-bold text-xs hover:bg-gold-light/20 transition-colors w-full border border-border-subtle"
-                          >
-                            <Copy className="w-4 h-4 text-gold" />
-                            نسخ تفاصيل الطلب (حل بديل)
-                          </button>
-                        </div>
-                      )}
+                      </div>
+
+                      <div className="space-y-3 mt-4">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">إرسال للعميل (نسخة احتياطية)</p>
+                        <button 
+                          onClick={() => {
+                            const customerMsg = `*تفاصيل طلبك من حياة ديزاين*\n\n` +
+                              `شكراً لك ${lastPlacedOrder.customerName} على طلبك!\n` +
+                              `رقم الطلب: #${lastPlacedOrder.id.slice(-6).toUpperCase()}\n` +
+                              `الإجمالي: ${lastPlacedOrder.total} ر.س\n\n` +
+                              `سيتم معالجة طلبك قريباً.`;
+                            const waUrl = `https://wa.me/${lastPlacedOrder.phone.replace(/^0/, '966')}?text=${encodeURIComponent(customerMsg)}`;
+                            window.open(waUrl, '_blank');
+                          }}
+                          className="flex items-center justify-center gap-2 px-6 py-4 bg-white border border-green-600 text-green-600 rounded-2xl font-bold hover:bg-green-50 transition-colors shadow-sm w-full"
+                        >
+                          <Smartphone className="w-5 h-5" />
+                          إرسال للعميل (واتساب)
+                        </button>
+                      </div>
                     </>
                   )}
                   <button 

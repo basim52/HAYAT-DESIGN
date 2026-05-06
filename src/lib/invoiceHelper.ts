@@ -1,104 +1,142 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Order, InvoiceConfig } from '../types';
+import arabicReshaper from 'arabic-reshaper';
+
+const fixArabicContent = (text: string | number | undefined | null) => {
+  if (text === undefined || text === null) return '';
+  const str = text.toString();
+  
+  // If it's Arabic, we use the reshaper to get the correct character forms
+  if (/[\u0600-\u06FF]/.test(str)) {
+    try {
+      return arabicReshaper.reshape(str);
+    } catch (e) {
+      return str;
+    }
+  }
+  return str;
+};
 
 export const generateInvoicePDF = async (order: Order, config: InvoiceConfig) => {
-  const invoiceElement = document.createElement('div');
-  invoiceElement.style.width = '800px';
-  invoiceElement.style.padding = '40px';
-  invoiceElement.style.background = '#ffffff';
-  invoiceElement.style.fontFamily = 'Arial, sans-serif';
-  invoiceElement.style.direction = 'rtl';
-  invoiceElement.style.position = 'absolute';
-  invoiceElement.style.left = '-9999px';
-  invoiceElement.style.top = '0';
-
   const subtotal = order.subtotal || order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const vatAmount = config.isTaxEnabled ? (subtotal * (config.vatRate / 100)) : 0;
   const totalWithVat = subtotal + vatAmount + (order.shippingCost || 0) - (order.discount || 0);
 
+  // Add Google Fonts
+  if (!document.getElementById('invoice-fonts')) {
+    const fontLink = document.createElement('link');
+    fontLink.id = 'invoice-fonts';
+    fontLink.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap';
+    fontLink.rel = 'stylesheet';
+    document.head.appendChild(fontLink);
+  }
+
+  await document.fonts.ready;
+
+  const invoiceElement = document.createElement('div');
+  invoiceElement.id = 'invoice-render-container';
+  invoiceElement.style.width = '800px';
+  invoiceElement.style.padding = '60px';
+  invoiceElement.style.background = '#ffffff';
+  invoiceElement.style.fontFamily = "'Inter', 'Cairo', sans-serif";
+  invoiceElement.style.direction = 'ltr'; 
+  invoiceElement.style.position = 'fixed';
+  invoiceElement.style.left = '-9999px';
+  invoiceElement.style.top = '0';
+  invoiceElement.style.textAlign = 'left';
+  invoiceElement.style.color = '#1e293b';
+
+  const isTaxEnabled = config.isTaxEnabled ?? false;
+
   invoiceElement.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #5830b0; padding-bottom: 20px; margin-bottom: 30px;">
-      <div style="text-align: right;">
-        <h1 style="margin: 0; color: #5830b0; font-size: 28px;">${config.isTaxEnabled ? 'فاتورة ضريبية' : 'فاتورة طلب'}</h1>
-        <p style="margin: 5px 0; font-size: 14px; color: #666;">رقم الطلب: #${order.id.slice(-6).toUpperCase()}</p>
-        <p style="margin: 5px 0; font-size: 14px; color: #666;">التاريخ: ${new Date(order.createdAt).toLocaleDateString('ar-SA')}</p>
-      </div>
+    <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 6px solid #5830b0; padding-bottom: 30px; margin-bottom: 40px;">
       <div style="text-align: left;">
-        ${config.logoUrl ? `<img src="${config.logoUrl}" style="max-height: 80px; max-width: 150px; object-contain;" />` : `<h2 style="margin:0; color: #5830b0;">${config.storeName}</h2>`}
+        <h1 style="margin: 0; color: #5830b0; font-size: 38px; font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em;">${isTaxEnabled ? 'Tax Invoice' : 'Order Invoice'}</h1>
+        <div style="margin-top: 15px;">
+          <p style="margin: 3px 0; font-size: 16px; color: #64748b; font-weight: 600;">Bill No: <span style="color: #14b8a6;">#${order.id.slice(-6).toUpperCase()}</span></p>
+          <p style="margin: 3px 0; font-size: 14px; color: #94a3b8;">Issue Date: ${new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        ${config.logoUrl ? `<img src="${config.logoUrl}" style="max-height: 120px; max-width: 240px; object-fit: contain;" />` : `<h2 style="margin:0; color: #5830b0; font-size: 32px; font-weight: 800; font-family: 'Cairo', sans-serif;">${fixArabicContent(config.storeName)}</h2>`}
       </div>
     </div>
 
-    <div style="display: grid; grid-cols: 2; gap: 40px; margin-bottom: 30px; display: flex; justify-content: space-between;">
-      <div style="flex: 1;">
-        <h3 style="font-size: 14px; color: #5830b0; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">بيانات العميل</h3>
-        <p style="margin: 5px 0; font-size: 13px;"><b>الاسم:</b> ${order.customerName}</p>
-        <p style="margin: 5px 0; font-size: 13px;"><b>المدينة:</b> ${order.city || '-'}</p>
-        <p style="margin: 5px 0; font-size: 13px;"><b>العنوان:</b> ${order.address}</p>
-        <p style="margin: 5px 0; font-size: 13px;"><b>الجوال:</b> ${order.phone}</p>
+    <div style="display: flex; justify-content: space-between; gap: 40px; margin-bottom: 50px;">
+      <div style="flex: 1; border-left: 4px solid #ccfbf1; padding-left: 20px;">
+        <h3 style="font-size: 13px; color: #14b8a6; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 800;">Customer Information</h3>
+        <div style="line-height: 1.6; font-size: 15px;">
+          <p style="margin: 4px 0; color: #1e293b; font-family: 'Cairo', sans-serif;"><strong>Name:</strong> ${fixArabicContent(order.customerName)}</p>
+          <p style="margin: 4px 0; color: #1e293b; font-family: 'Cairo', sans-serif;"><strong>City:</strong> ${fixArabicContent(order.city || '-')}</p>
+          <p style="margin: 4px 0; color: #1e293b; font-family: 'Cairo', sans-serif;"><strong>Address:</strong> ${fixArabicContent(order.address)}</p>
+          <p style="margin: 4px 0; color: #1e293b;"><strong>Contact:</strong> ${order.phone}</p>
+        </div>
       </div>
-      <div style="flex: 1; text-align: left;">
-        <h3 style="font-size: 14px; color: #5830b0; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">بيانات المتجر</h3>
-        <p style="margin: 5px 0; font-size: 13px;"><b>المتجر:</b> ${config.storeName}</p>
-        ${config.isTaxEnabled ? `<p style="margin: 5px 0; font-size: 13px;"><b>الرقم الضريبي:</b> ${config.taxNumber || '-'}</p>` : ''}
-        <p style="margin: 5px 0; font-size: 13px;"><b>العنوان:</b> ${config.storeAddress}</p>
-        <p style="margin: 5px 0; font-size: 13px;"><b>التواصل:</b> ${config.phone}</p>
+      <div style="flex: 1; border-left: 4px solid #ede9fe; padding-left: 20px;">
+        <h3 style="font-size: 13px; color: #5830b0; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 800;">Merchant Information</h3>
+        <div style="line-height: 1.6; font-size: 15px;">
+          <p style="margin: 4px 0; color: #1e293b; font-family: 'Cairo', sans-serif;"><strong>Merchant:</strong> ${fixArabicContent(config.storeName)}</p>
+          ${isTaxEnabled ? `<p style="margin: 4px 0; color: #1e293b;"><strong>TRN:</strong> ${config.taxNumber || '-'}</p>` : ''}
+          <p style="margin: 4px 0; color: #1e293b; font-family: 'Cairo', sans-serif;"><strong>Address:</strong> ${fixArabicContent(config.storeAddress)}</p>
+          <p style="margin: 4px 0; color: #1e293b;"><strong>Phone:</strong> ${config.phone}</p>
+        </div>
       </div>
     </div>
 
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
       <thead>
-        <tr style="background: #f8f9fa;">
-          <th style="padding: 12px; text-align: right; border-bottom: 2px solid #5830b0; font-size: 13px;">المنتج</th>
-          <th style="padding: 12px; text-align: center; border-bottom: 2px solid #5830b0; font-size: 13px;">الكمية</th>
-          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #5830b0; font-size: 13px;">السعر</th>
-          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #5830b0; font-size: 13px;">المجموع</th>
+        <tr style="background: #f8fafc; border-bottom: 2px solid #5830b0;">
+          <th style="padding: 18px 12px; text-align: left; font-size: 13px; font-weight: 800; color: #64748b; text-transform: uppercase;">Item Description</th>
+          <th style="padding: 18px 12px; text-align: center; font-size: 13px; font-weight: 800; color: #64748b; text-transform: uppercase;">Qty</th>
+          <th style="padding: 18px 12px; text-align: right; font-size: 13px; font-weight: 800; color: #64748b; text-transform: uppercase;">Unit Price</th>
+          <th style="padding: 18px 12px; text-align: right; font-size: 13px; font-weight: 800; color: #64748b; text-transform: uppercase;">Amount</th>
         </tr>
       </thead>
       <tbody>
         ${order.items.map(item => `
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 12px; text-align: right; font-size: 12px;">${item.name}</td>
-            <td style="padding: 12px; text-align: center; font-size: 12px;">${item.quantity}</td>
-            <td style="padding: 12px; text-align: left; font-size: 12px;">${item.price} ر.س</td>
-            <td style="padding: 12px; text-align: left; font-size: 12px;">${(item.price * item.quantity).toFixed(2)} ر.س</td>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 18px 12px; font-size: 14px; font-weight: 500; font-family: 'Cairo', sans-serif;">${fixArabicContent(item.name)}</td>
+            <td style="padding: 18px 12px; text-align: center; font-size: 14px;">${item.quantity}</td>
+            <td style="padding: 18px 12px; text-align: right; font-size: 14px;">${item.price.toFixed(2)} SAR</td>
+            <td style="padding: 18px 12px; text-align: right; font-size: 14px; font-weight: 700; color: #5830b0;">${(item.price * item.quantity).toFixed(2)} SAR</td>
           </tr>
         `).join('')}
       </tbody>
     </table>
 
-    <div style="display: flex; justify-content: flex-end;">
-      <div style="width: 250px; background: #f8f9fa; padding: 20px; rounded: 10px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-          <span style="color: #666;">المجموع الفرعي:</span>
-          <span>${subtotal.toFixed(2)} ر.س</span>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 60px;">
+      <div style="width: 350px; background: #ffffff; padding: 25px; border: 2px solid #5830b0; border-radius: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 15px;">
+          <span style="color: #64748b; font-weight: 600;">Sub-Total:</span>
+          <span style="font-weight: 700;">${subtotal.toFixed(2)} SAR</span>
         </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-          <span style="color: #666;">الشحن:</span>
-          <span>${(order.shippingCost || 0).toFixed(2)} ر.س</span>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 15px;">
+          <span style="color: #64748b; font-weight: 600;">Shipping:</span>
+          <span style="font-weight: 700;">${(order.shippingCost || 0).toFixed(2)} SAR</span>
         </div>
         ${order.discount ? `
-          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #dc3545;">
-            <span>الخصم:</span>
-            <span>-${order.discount.toFixed(2)} ر.س</span>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 15px; color: #ef4444;">
+            <span style="font-weight: 600;">Discount:</span>
+            <span style="font-weight: 700;">-${order.discount.toFixed(2)} SAR</span>
           </div>
         ` : ''}
-        ${config.isTaxEnabled ? `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
-          <span style="color: #666;">الضريبة (${config.vatRate}%):</span>
-          <span>${vatAmount.toFixed(2)} ر.س</span>
+        ${isTaxEnabled ? `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 15px; color: #14b8a6;">
+          <span style="font-weight: 600;">VAT (${config.vatRate}%):</span>
+          <span style="font-weight: 700;">${vatAmount.toFixed(2)} SAR</span>
         </div>
         ` : ''}
-        <div style="display: flex; justify-content: space-between; border-top: 2px solid #5830b0; pt: 12px; margin-top: 10px; font-weight: bold; font-size: 16px; color: #5830b0;">
-          <span>الإجمالي:</span>
-          <span>${totalWithVat.toFixed(2)} ر.س</span>
+        <div style="display: flex; justify-content: space-between; border-top: 2px solid #5830b0; padding-top: 15px; margin-top: 5px;">
+          <span style="font-size: 20px; font-weight: 800; color: #5830b0; text-transform: uppercase;">Total:</span>
+          <span style="font-size: 22px; font-weight: 800; color: #5830b0;">${totalWithVat.toFixed(2)} SAR</span>
         </div>
       </div>
     </div>
 
-    <div style="margin-top: 40px; text-align: center; color: #999; font-size: 11px; border-top: 1px solid #eee; padding-top: 20px;">
-      <p>${config.footerMessage || 'شكراً لتعاملكم معنا'}</p>
-      <p>هذه الفاتورة تم إصدارها آلياً ولا تتطلب توقيعاً</p>
+    <div style="text-align: center; color: #94a3b8; font-size: 13px;">
+      <p style="color: #5830b0; font-size: 18px; font-weight: 700; margin-bottom: 10px; font-family: 'Cairo', sans-serif;">${fixArabicContent(config.footerMessage || 'Thank you for choosing us')}</p>
+      <p>This invoice was generated electronically.</p>
     </div>
   `;
 
@@ -106,19 +144,28 @@ export const generateInvoicePDF = async (order: Order, config: InvoiceConfig) =>
 
   try {
     const canvas = await html2canvas(invoiceElement, {
-      scale: 2,
+      scale: 4, // Higher scale for extreme clarity
       useCORS: true,
       logging: false,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      onclone: (clonedDoc) => {
+        const element = clonedDoc.getElementById('invoice-render-container');
+        if (element) {
+          element.style.left = '0';
+          element.style.position = 'relative';
+        }
+      }
     });
 
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/png', 1.0);
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
     pdf.save(`invoice-${order.id.slice(-6).toUpperCase()}.pdf`);
+  } catch (error) {
+    console.error('PDF Generation error:', error);
   } finally {
     document.body.removeChild(invoiceElement);
   }

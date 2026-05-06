@@ -580,7 +580,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                                         ) : (
                                           <Download className="w-3 h-3" />
                                         )}
-                                        <span>تحميل الفاتورة الضريبية (PDF)</span>
+                                        <span>{invoiceConfig?.isTaxEnabled ? 'تحميل الفاتورة الضريبية (PDF)' : 'تحميل فاتورة الطلب (PDF)'}</span>
                                       </button>
                                     </div>
                                   </div>

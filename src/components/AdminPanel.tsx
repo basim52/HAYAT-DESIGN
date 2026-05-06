@@ -1780,7 +1780,7 @@ export default function AdminPanel({
                                           ) : (
                                             <Download className="w-4 h-4" />
                                           )}
-                                          <span>تحميل الفاتورة الضريبية (PDF)</span>
+                                          <span>{invoiceConfig?.isTaxEnabled ? 'تحميل الفاتورة الضريبية (PDF)' : 'تحميل فاتورة الطلب (PDF)'}</span>
                                         </button>
                                       </div>
                                     </div>
