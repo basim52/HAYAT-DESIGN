@@ -87,8 +87,6 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0]);
-  const [receiptImage, setReceiptImage] = useState<string | null>(null);
-  const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const [useAlternativeInfo, setUseAlternativeInfo] = useState(false);
 
   // Coupon State
@@ -186,10 +184,6 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
       alert('عذراً، يرجى اختيار وسيلة شحن متوفرة لمدينتك لإتمام الطلب');
       return;
     }
-    if (!receiptImage) {
-      alert('يرجى إرفاق صورة إيصال التحويل البنكي لإتمام الطلب');
-      return;
-    }
 
     setIsSubmitting(true);
     
@@ -214,7 +208,6 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
         total: finalTotal,
         status: 'pending',
         paymentMethod: selectedMethod.bankName,
-        hasReceipt: !!receiptImage,
         createdAt: new Date().toISOString()
       };
       
@@ -231,38 +224,18 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
 
       // Automatically attempt to share/send PDF Invoice
       if (invoiceConfig) {
-        try {
-          // 1. Generate and get the PDF
-          const pdf = await generateInvoicePDF(orderData as Order, invoiceConfig);
-          const fileName = `invoice-${orderData.id.slice(-6).toUpperCase()}.pdf`;
-          
-          // 2. Trigger download automatically so the user has the file
-          pdf.save(fileName);
-
-          // 3. Open WhatsApp chat with the merchant directly
+        const shared = await shareInvoicePDF(orderData as Order, invoiceConfig);
+        if (!shared) {
+          // If native sharing failed (e.g. on Desktop), the helper already downloaded the file.
+          // Now just open WhatsApp with a text message.
           const waMessage = `*طلب جديد من حياة ديزاين*\n\n` +
-            `تم تسجيل الطلب برقم: #${orderData.id.slice(-6).toUpperCase()}\n` +
+            `رقم الطلب: #${orderData.id.slice(-6).toUpperCase()}\n` +
             `الاسم: ${orderData.customerName}\n` +
             `الإجمالي: ${orderData.total} ر.س\n\n` +
             `*تم تحميل الفاتورة (PDF) تلقائياً، يرجى إرفاقها هنا لإتمام الطلب.*`;
           
           const waUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodeURIComponent(waMessage)}`;
           window.open(waUrl, '_blank');
-
-          // 4. Also trigger the share sheet on mobile as a secondary direct method
-          if (navigator.share && navigator.canShare) {
-            const blob = pdf.output('blob');
-            const file = new File([blob], fileName, { type: 'application/pdf' });
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: `Order #${orderData.id.slice(-6).toUpperCase()}`,
-                text: waMessage
-              }).catch(() => { /* User cancelled share sheet, that's okay */ });
-            }
-          }
-        } catch (pdfErr) {
-          console.error('Invoice automation failed:', pdfErr);
         }
       }
 
@@ -273,21 +246,6 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
       alert('حدث خطأ أثناء تسجيل الطلب، يرجى المحاولة مرة أخرى');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 20 * 1024 * 1024) {
-        alert('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 20 ميجابايت');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageToEdit(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -727,45 +685,6 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           )}
                         </div>
                       </div>
-
-                      {/* Receipt Upload */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-center px-1">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-purple">إيصال التحويل البنكي</label>
-                          <span className="text-[9px] text-red-500 font-bold">* مطلوب</span>
-                        </div>
-                        <div className="relative">
-                          <input 
-                            type="file"
-                            accept="image/*"
-                            required
-                            onChange={handleImageUpload}
-                            className="hidden"
-                            id="checkout-receipt-upload"
-                          />
-                          <label 
-                            htmlFor="checkout-receipt-upload"
-                            className={`flex items-center justify-between px-5 py-4 border border-dashed rounded-3xl cursor-pointer transition-all ${receiptImage ? 'bg-green-50 border-green-500' : 'bg-muted-bg/30 border-brand-purple/20 hover:bg-gold-light/20'}`}
-                          >
-                            <span className={`text-[11px] font-black underline-offset-4 underline ${receiptImage ? 'text-green-600' : 'text-brand-purple'}`}>
-                              {receiptImage ? 'تم التعرف على الإيصال - جاهز للإرسال' : 'اضغط هنا لرفع صورة الإيصال (ضروري جداً)'}
-                            </span>
-                            <ImageIcon className={`w-5 h-5 ${receiptImage ? 'text-green-500' : 'text-brand-purple'}`} />
-                          </label>
-                          {receiptImage && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <img src={receiptImage} className="w-12 h-12 object-cover rounded-xl border border-border-subtle" alt="Preview" />
-                              <button 
-                                type="button"
-                                onClick={() => setReceiptImage(null)}
-                                className="text-[9px] font-bold text-red-500 hover:underline"
-                              >
-                                إزالة الصورة
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
                     </div>
 
                     <div className="flex flex-col gap-3 pt-2">
@@ -800,15 +719,6 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
         </>
       )}
       </AnimatePresence>
-      <ImageEditorModal 
-        isOpen={!!imageToEdit}
-        image={imageToEdit || ''}
-        onClose={() => setImageToEdit(null)}
-        onSave={(cropped) => {
-          setReceiptImage(cropped);
-          setImageToEdit(null);
-        }}
-      />
     </>
   );
 }

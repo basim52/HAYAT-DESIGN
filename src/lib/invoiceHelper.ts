@@ -179,15 +179,21 @@ export const shareInvoicePDF = async (order: Order, config: InvoiceConfig) => {
     const blob = pdf.output('blob');
     const file = new File([blob], fileName, { type: 'application/pdf' });
 
+    const shareText = `*طلب جديد من حياة ديزاين*\n` +
+      `رقم الطلب: #${order.id.slice(-6).toUpperCase()}\n` +
+      `الاسم: ${order.customerName}\n` +
+      `الإجمالي: ${order.total} ر.س\n\n` +
+      `مرفق فاتورة الطلب (PDF).`;
+
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
         files: [file],
-        title: `Order #${order.id.slice(-6).toUpperCase()}`,
-        text: `Order details for ${order.customerName}`
+        title: `فاتورة طلب #${order.id.slice(-6).toUpperCase()}`,
+        text: shareText
       });
       return true;
     } else {
-      // Fallback to download if sharing is not supported
+      // Fallback: Download and return false so caller can handle WhatsApp text fallback
       pdf.save(fileName);
       return false;
     }
