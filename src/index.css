@@ -50,6 +50,8 @@ body.theme-creative {
   html {
     scroll-behavior: smooth;
     overflow-x: hidden;
+    /* Fix layout jump when scrollbar is hidden/shown */
+    scrollbar-gutter: stable;
   }
 
   body {

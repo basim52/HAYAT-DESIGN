@@ -54,11 +54,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const checkMobile = () => {
       cancelAnimationFrame(frameId);
       frameId = requestAnimationFrame(() => {
-        const mobile = window.innerWidth <= 768;
-        setIsMobileView(prev => prev === mobile ? prev : mobile);
+        // Use a small buffer to avoid flickering on exact boundary
+        const width = window.innerWidth;
+        const isMobile = width <= 768;
+        
+        setIsMobileView(prev => {
+          // Only update if difference is significant or platform changes
+          if (prev === isMobile) return prev;
+          return isMobile;
+        });
       });
     };
     
+    checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => {
       window.removeEventListener('resize', checkMobile);

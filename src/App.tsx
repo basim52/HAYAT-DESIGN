@@ -111,6 +111,18 @@ export default function App() {
     localStorage.setItem('hayat_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
+  const handleCheckout = useCallback(() => {
+    setIsCartOpen(false);
+    setIsCheckoutOpen(true);
+  }, []);
+
+  const filteredProductsWithSearch = useMemo(() => {
+    return products.filter(product => 
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [products, searchQuery]);
+
   const handleAddToCart = useCallback((product: Product) => {
     setCartItems((prev) => {
       const existing = prev.find((item) => item.id === product.id);
@@ -167,18 +179,16 @@ export default function App() {
     }
   }, []);
 
-  const handleCheckout = () => {
+  const handleContinueShopping = useCallback(() => {
     setIsCartOpen(false);
-    setIsCheckoutOpen(true);
-  };
-
-  const filteredProductsWithSearch = products.filter(product => 
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    // Use a small delay for the scroll to avoid conflicting with the drawer closing animation
+    setTimeout(() => {
+      handleNavClick('products');
+    }, 300);
+  }, [handleNavClick]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-body-bg">
       <Navbar 
         cartCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)} 
         onCartClick={() => setIsCartOpen(true)}
@@ -248,10 +258,7 @@ export default function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemove={handleRemoveFromCart}
         onCheckout={handleCheckout}
-        onContinueShopping={() => {
-          setIsCartOpen(false);
-          handleNavClick('products');
-        }}
+        onContinueShopping={handleContinueShopping}
       />
 
       <CheckoutModal 

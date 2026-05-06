@@ -29,16 +29,7 @@ export default function CartDrawer({
         <>
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ 
-              opacity: [1, 0.95, 1]
-            }}
-            transition={{
-              opacity: {
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }
-            }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]"
