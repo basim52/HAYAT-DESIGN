@@ -231,9 +231,38 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
 
       // Automatically attempt to share/send PDF Invoice
       if (invoiceConfig) {
-        const shared = await shareInvoicePDF(orderData as Order, invoiceConfig);
-        if (!shared) {
-          console.log('PDF downloaded as fallback');
+        try {
+          // 1. Generate and get the PDF
+          const pdf = await generateInvoicePDF(orderData as Order, invoiceConfig);
+          const fileName = `invoice-${orderData.id.slice(-6).toUpperCase()}.pdf`;
+          
+          // 2. Trigger download automatically so the user has the file
+          pdf.save(fileName);
+
+          // 3. Open WhatsApp chat with the merchant directly
+          const waMessage = `*طلب جديد من حياة ديزاين*\n\n` +
+            `تم تسجيل الطلب برقم: #${orderData.id.slice(-6).toUpperCase()}\n` +
+            `الاسم: ${orderData.customerName}\n` +
+            `الإجمالي: ${orderData.total} ر.س\n\n` +
+            `*تم تحميل الفاتورة (PDF) تلقائياً، يرجى إرفاقها هنا لإتمام الطلب.*`;
+          
+          const waUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodeURIComponent(waMessage)}`;
+          window.open(waUrl, '_blank');
+
+          // 4. Also trigger the share sheet on mobile as a secondary direct method
+          if (navigator.share && navigator.canShare) {
+            const blob = pdf.output('blob');
+            const file = new File([blob], fileName, { type: 'application/pdf' });
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: `Order #${orderData.id.slice(-6).toUpperCase()}`,
+                text: waMessage
+              }).catch(() => { /* User cancelled share sheet, that's okay */ });
+            }
+          }
+        } catch (pdfErr) {
+          console.error('Invoice automation failed:', pdfErr);
         }
       }
 
@@ -293,13 +322,37 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                 </div>
                 <h2 className="text-3xl font-bold">تم تسجيل طلبك!</h2>
                 <p className="text-gray-500 max-w-sm mx-auto">
-                  لقد حفظنا بيانات طلبك في النظام بنجاح. تم إصدار فاتورة طلبك (PDF) وجاري مشاركتها معك:
+                  لقد حفظنا بيانات طلبك بنجاح. تم إصدار الفاتورة وتجهيز محادثة الواتساب لإرسالها للمتجر لإكمال الطلب.
                 </p>
                 <div className="flex flex-col gap-3 max-w-xs mx-auto">
                   {lastPlacedOrder && invoiceConfig && (
                     <div className="space-y-4 w-full">
                       <div className="space-y-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">تحميل الفاتورة</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">مشاركة الطلب (PDF)</p>
+                        <button 
+                          onClick={async () => {
+                            setIsGeneratingInvoice(true);
+                            try {
+                              const shared = await shareInvoicePDF(lastPlacedOrder, invoiceConfig);
+                              if (!shared) {
+                                // Fallback if browser blocks automatic opening
+                                const waMessage = `*تفاصيل طلبي #${lastPlacedOrder.id.slice(-6).toUpperCase()}*`;
+                                window.open(`https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodeURIComponent(waMessage)}`, '_blank');
+                              }
+                            } finally {
+                              setIsGeneratingInvoice(false);
+                            }
+                          }}
+                          disabled={isGeneratingInvoice}
+                          className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-600/20 w-full"
+                        >
+                          {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5" />}
+                          مشاركة الفاتورة في واتساب
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">خيارات إضافية</p>
                         <button
                           onClick={async () => {
                             setIsGeneratingInvoice(true);
@@ -314,29 +367,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           className="flex items-center justify-center gap-2 px-6 py-4 bg-white border border-brand-purple text-brand-purple rounded-2xl font-bold hover:bg-brand-purple/5 transition-colors shadow-sm w-full"
                         >
                           {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                          <span>تحميل بنسخة PDF ولصقها يدوياً</span>
-                        </button>
-                      </div>
-
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إعادة محاولة المشاركة</p>
-                        <button 
-                          onClick={async () => {
-                            setIsGeneratingInvoice(true);
-                            try {
-                              const shared = await shareInvoicePDF(lastPlacedOrder, invoiceConfig);
-                              if (!shared) {
-                                alert('تم تحميل الفاتورة. يمكنك الآن مشاركتها يدوياً مع المتجر أو العميل.');
-                              }
-                            } finally {
-                              setIsGeneratingInvoice(false);
-                            }
-                          }}
-                          disabled={isGeneratingInvoice}
-                          className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-600/20 w-full"
-                        >
-                          {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5" />}
-                          مشاركة الفاتورة (PDF)
+                          <span>تحميل الفاتورة يدوياً (PDF)</span>
                         </button>
                       </div>
                     </div>
