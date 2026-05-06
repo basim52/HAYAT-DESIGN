@@ -264,6 +264,10 @@ export default function App() {
       <CheckoutModal 
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
+        onSuccess={() => {
+          setCartItems([]);
+          localStorage.removeItem('hayat_cart');
+        }}
         cartItems={cartItems}
         userProfile={profile}
       />

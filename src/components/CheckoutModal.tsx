@@ -11,11 +11,12 @@ import ImageEditorModal from './ImageEditorModal';
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   cartItems: CartItem[];
   userProfile: UserProfile | null;
 }
 
-export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile }: CheckoutModalProps) {
+export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, userProfile }: CheckoutModalProps) {
   const [formData, setFormData] = useState({
     customerName: '',
     phone: '',
@@ -169,6 +170,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, userProfile 
         window.open(whatsappUrl, '_blank');
       }
       
+      onSuccess?.();
       setShowSuccess(true);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'orders');
