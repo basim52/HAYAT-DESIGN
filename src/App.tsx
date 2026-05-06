@@ -67,27 +67,28 @@ export default function App() {
   useEffect(() => {
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-      setProducts(docs.length > 0 ? docs : initialProducts);
+      setProducts(prev => JSON.stringify(prev) === JSON.stringify(docs) ? prev : (docs.length > 0 ? docs : initialProducts));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'products'));
 
     const unsubCategories = onSnapshot(collection(db, 'categories'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
-      setAllCategories(docs);
+      setAllCategories(prev => JSON.stringify(prev) === JSON.stringify(docs) ? prev : docs);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'categories'));
 
     const unsubBanners = onSnapshot(collection(db, 'banners'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      setAllBanners(docs);
+      setAllBanners(prev => JSON.stringify(prev) === JSON.stringify(docs) ? prev : docs);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'banners'));
 
     const unsubTestimonials = onSnapshot(collection(db, 'testimonials'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
-      setTestimonials(docs);
+      setTestimonials(prev => JSON.stringify(prev) === JSON.stringify(docs) ? prev : docs);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'testimonials'));
 
     const unsubConfig = onSnapshot(doc(db, 'config', 'general'), (docSnap) => {
       if (docSnap.exists()) {
-        setGeneralConfig(docSnap.data());
+        const data = docSnap.data();
+        setGeneralConfig(prev => JSON.stringify(prev) === JSON.stringify(data) ? prev : data);
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'config/general'));
 

@@ -43,33 +43,42 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [configs, setConfigs] = useState<PlatformConfigs>(defaultConfigs);
   const [previewConfig, setPreviewConfig] = useState<{ platform: 'web' | 'mobile', config: ThemeConfig } | null>(null);
-  const [isMobileView, setIsMobileView] = useState(
-    typeof window !== 'undefined' ? (window.innerWidth <= 768) : false
-  );
+  const [isMobileView, setIsMobileView] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 768;
+  });
   const [adminForcePlatform, setAdminForcePlatform] = useState<'web' | 'mobile' | null>(null);
 
   useEffect(() => {
+    let frameId: number;
     const checkMobile = () => {
-      setIsMobileView(window.innerWidth <= 768);
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        const mobile = window.innerWidth <= 768;
+        setIsMobileView(prev => prev === mobile ? prev : mobile);
+      });
     };
-    checkMobile();
+    
     window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      cancelAnimationFrame(frameId);
+    };
   }, []);
 
-  useEffect(() => {
+  React.useLayoutEffect(() => {
     const unsub = onSnapshot(doc(db, 'config', 'themes'), (docSnap) => {
       if (docSnap.exists()) {
-        setConfigs(docSnap.data() as PlatformConfigs);
+        const data = docSnap.data() as PlatformConfigs;
+        setConfigs(prev => JSON.stringify(prev) === JSON.stringify(data) ? prev : data);
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'config/themes'));
     return unsub;
   }, []);
 
   React.useLayoutEffect(() => {
-    // Determine which config to apply
-    let activeConfig: ThemeConfig;
     const effectivePlatform = adminForcePlatform || (isMobileView ? 'mobile' : 'web');
+    let activeConfig: ThemeConfig;
     
     if (effectivePlatform === 'mobile') {
       activeConfig = (previewConfig?.platform === 'mobile') ? previewConfig.config : configs.mobile;
@@ -77,14 +86,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       activeConfig = (previewConfig?.platform === 'web') ? previewConfig.config : configs.web;
     }
 
-    // Apply colors to CSS Variables
     const root = document.documentElement;
     root.style.setProperty('--brand-purple', activeConfig.primaryColor);
     root.style.setProperty('--brand-teal', activeConfig.secondaryColor);
     root.style.setProperty('--brand-gold', activeConfig.accentColor);
     
-    // Apply Theme specific classes to body
-    document.body.className = `theme-${activeConfig.activeTheme}`;
+    if (document.body.className !== `theme-${activeConfig.activeTheme}`) {
+      document.body.className = `theme-${activeConfig.activeTheme}`;
+    }
   }, [configs, previewConfig, isMobileView, adminForcePlatform]);
 
   const setPreview = (platform: 'web' | 'mobile', newConfig: Partial<ThemeConfig> | null) => {

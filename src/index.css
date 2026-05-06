@@ -43,9 +43,28 @@ body.theme-creative {
 }
 
 @layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-body-bg text-charcoal font-sans antialiased;
     direction: rtl;
+    overflow-x: hidden;
+    text-rendering: optimizeLegibility;
+    min-height: 100vh;
+  }
+
+  /* Content Visibility Stabilization */
+  main > section, 
+  main > div:not(.drawer) {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px;
   }
 
   h1, h2, h3, h4, h5, h6 {
