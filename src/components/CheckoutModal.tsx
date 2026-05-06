@@ -86,12 +86,10 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
   const [isCopied, setIsCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [orderUrls, setOrderUrls] = useState<{ whatsappUrl: string; mailtoUrl: string } | null>(null);
   const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHODS[0]);
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const [useAlternativeInfo, setUseAlternativeInfo] = useState(false);
-  const [preferredMethod, setPreferredMethod] = useState<'whatsapp' | 'email' | null>(null);
 
   // Coupon State
   const [couponInput, setCouponInput] = useState('');
@@ -155,7 +153,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
     }
   };
 
-  const handleOrderSubmission = async (e: FormEvent, preference: 'whatsapp' | 'email') => {
+  const handleOrderSubmission = async (e: FormEvent) => {
     e.preventDefault();
     
     // Explicit Validation with specific messages
@@ -231,40 +229,14 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
         });
       }
 
-      const itemsList = cartItems
-        .map(item => `• ${item.name} (الكمية: ${item.quantity}) - السعر: ${item.price * item.quantity} ر.س`)
-        .join('\n');
-
-      const message = `*طلب جديد من حياة ديزاين*\n\n` +
-        `*بيانات العميل:*\n` +
-        `الاسم: ${formData.customerName}\n` +
-        `رقم الجوال: ${formData.phone}\n` +
-        `المدينة: ${formData.city}\n` +
-        `العنوان: ${formData.address}\n` +
-        (formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : '') +
-        `\n*تفاصيل الطلب:*\n${itemsList}\n\n` +
-        `*ملخص الحساب:*\n` +
-        `المجموع الفرعي: ${subtotal} ر.س\n` +
-        `الشحن (${shippingType}): ${shippingCost} ر.س\n` +
-        (appliedCoupon ? `الخصم (${appliedCoupon.code}): -${discountAmount} ر.س\n` : '') +
-        `*طريقة الدفع:* ${selectedMethod.bankName}\n` +
-        `*الإجمالي النهائي:* ${finalTotal} ر.س\n\n` +
-        `${receiptImage ? '*تم إرفاق إيصال التحويل بداخل النظام*' : '*سأقوم بإرسال إيصال التحويل الآن*'}`;
-
-      const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodedMessage}`;
-      
-      const subject = `طلب جديد - ${formData.customerName}`;
-      const emailBody = `الاسم: ${formData.customerName}\nالجوال: ${formData.phone}\nالمدينة: ${formData.city}\nالعنوان: ${formData.address}\n${formData.shortAddress ? `العنوان المختصر: ${formData.shortAddress}\n` : ''}\n\nالشحن: ${shippingType} (${shippingCost} ر.س)\nتفاصيل الطلب:\n${cartItems.map(i => `${i.name} x${i.quantity}`).join('\n')}\n\nالإجمالي النهائي: ${finalTotal} ر.س`;
-      const mailtoUrl = `mailto:hayat.desiign@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
-
-      setOrderUrls({ whatsappUrl, mailtoUrl });
-      setPreferredMethod(preference);
-      
-      if (preference === 'whatsapp') {
-        window.open(whatsappUrl, '_blank');
+      // Automatically attempt to share/send PDF Invoice
+      if (invoiceConfig) {
+        const shared = await shareInvoicePDF(orderData as Order, invoiceConfig);
+        if (!shared) {
+          console.log('PDF downloaded as fallback');
+        }
       }
-      
+
       onSuccess?.();
       setShowSuccess(true);
     } catch (err) {
@@ -321,42 +293,40 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                 </div>
                 <h2 className="text-3xl font-bold">تم تسجيل طلبك!</h2>
                 <p className="text-gray-500 max-w-sm mx-auto">
-                  لقد حفظنا بيانات طلبك في النظام بنجاح. يرجى إتمام الإرسال لتأكيد الطلب والحصول على الفاتورة:
+                  لقد حفظنا بيانات طلبك في النظام بنجاح. تم إصدار فاتورة طلبك (PDF) وجاري مشاركتها معك:
                 </p>
                 <div className="flex flex-col gap-3 max-w-xs mx-auto">
                   {lastPlacedOrder && invoiceConfig && (
-                    <div className="space-y-2 mb-4">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إدارة الفاتورة</p>
-                      <button
-                        onClick={async () => {
-                          setIsGeneratingInvoice(true);
-                          try {
-                            const pdf = await generateInvoicePDF(lastPlacedOrder, invoiceConfig);
-                            pdf.save(`invoice-${lastPlacedOrder.id.slice(-6).toUpperCase()}.pdf`);
-                          } finally {
-                            setIsGeneratingInvoice(false);
-                          }
-                        }}
-                        disabled={isGeneratingInvoice}
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-white border border-brand-purple text-brand-purple rounded-2xl font-bold hover:bg-brand-purple/5 transition-colors shadow-sm w-full"
-                      >
-                        {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                        <span>تحميل فاتورتك (PDF)</span>
-                      </button>
-                    </div>
-                  )}
+                    <div className="space-y-4 w-full">
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">تحميل الفاتورة</p>
+                        <button
+                          onClick={async () => {
+                            setIsGeneratingInvoice(true);
+                            try {
+                              const pdf = await generateInvoicePDF(lastPlacedOrder, invoiceConfig);
+                              pdf.save(`invoice-${lastPlacedOrder.id.slice(-6).toUpperCase()}.pdf`);
+                            } finally {
+                              setIsGeneratingInvoice(false);
+                            }
+                          }}
+                          disabled={isGeneratingInvoice}
+                          className="flex items-center justify-center gap-2 px-6 py-4 bg-white border border-brand-purple text-brand-purple rounded-2xl font-bold hover:bg-brand-purple/5 transition-colors shadow-sm w-full"
+                        >
+                          {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                          <span>تحميل بنسخة PDF ولصقها يدوياً</span>
+                        </button>
+                      </div>
 
-                  {orderUrls && lastPlacedOrder && (
-                    <>
-                      <div className="space-y-3">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">مشاركة الطلب (للمتجر)</p>
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إعادة محاولة المشاركة</p>
                         <button 
                           onClick={async () => {
                             setIsGeneratingInvoice(true);
                             try {
                               const shared = await shareInvoicePDF(lastPlacedOrder, invoiceConfig);
                               if (!shared) {
-                                alert('تم تحميل الفاتورة. يرجى إرسالها يدوياً للمتجر عبر واتساب.');
+                                alert('تم تحميل الفاتورة. يمكنك الآن مشاركتها يدوياً مع المتجر أو العميل.');
                               }
                             } finally {
                               setIsGeneratingInvoice(false);
@@ -366,32 +336,10 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                           className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-600/20 w-full"
                         >
                           {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5" />}
-                          إرسال للمتجر (PDF)
+                          مشاركة الفاتورة (PDF)
                         </button>
                       </div>
-
-                      <div className="space-y-3 mt-4">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">إرسال للعميل (واتساب)</p>
-                        <button 
-                          onClick={async () => {
-                            setIsGeneratingInvoice(true);
-                            try {
-                              const shared = await shareInvoicePDF(lastPlacedOrder, invoiceConfig);
-                              if (!shared) {
-                                alert('تم تحميل الفاتورة. يرجى إرسالها يدوياً للعميل.');
-                              }
-                            } finally {
-                              setIsGeneratingInvoice(false);
-                            }
-                          }}
-                          disabled={isGeneratingInvoice}
-                          className="flex items-center justify-center gap-2 px-6 py-4 bg-white border border-green-600 text-green-600 rounded-2xl font-bold hover:bg-green-50 transition-colors shadow-sm w-full"
-                        >
-                          {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
-                          إرسال للعميل (PDF)
-                        </button>
-                      </div>
-                    </>
+                    </div>
                   )}
                   <button 
                     onClick={() => {
@@ -789,32 +737,28 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div className="flex flex-col gap-3 pt-2">
                       <button
                         type="button"
                         disabled={isSubmitting}
-                        onClick={(e) => handleOrderSubmission(e, 'whatsapp')}
-                        className="py-4 bg-green-600 text-white rounded-2xl font-bold text-xs hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        onClick={(e) => handleOrderSubmission(e)}
+                        className="py-6 bg-green-600 text-white rounded-3xl font-bold text-sm hover:bg-green-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-green-600/20 disabled:opacity-50"
                       >
-                        {isSubmitting ? 'جاري...' : (
+                        {isSubmitting ? (
+                          <Clock className="w-5 h-5 animate-spin" />
+                        ) : (
                           <>
-                            <MessageCircle className="w-4 h-4" />
-                            إرسال عبر واتساب
+                            <MessageCircle className="w-5 h-5" />
+                            تأكيد الطلب وإصدار الفاتورة (PDF)
                           </>
                         )}
                       </button>
                       <button
                         type="button"
-                        disabled={isSubmitting}
-                        onClick={(e) => handleOrderSubmission(e, 'email')}
-                        className="py-4 bg-brand-purple text-white rounded-2xl font-bold text-xs hover:bg-brand-purple/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        onClick={onClose}
+                        className="py-4 text-xs font-bold text-gray-400 hover:text-charcoal transition-colors underline underline-offset-4"
                       >
-                        {isSubmitting ? 'جاري...' : (
-                          <>
-                            <Mail className="w-4 h-4" />
-                            إرسال عبر الايميل
-                          </>
-                        )}
+                        إلغاء والعودة
                       </button>
                     </div>
                   </div>
