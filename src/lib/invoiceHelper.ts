@@ -163,10 +163,36 @@ export const generateInvoicePDF = async (order: Order, config: InvoiceConfig) =>
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-    pdf.save(`invoice-${order.id.slice(-6).toUpperCase()}.pdf`);
+    return pdf;
   } catch (error) {
     console.error('PDF Generation error:', error);
+    throw error;
   } finally {
     document.body.removeChild(invoiceElement);
+  }
+};
+
+export const shareInvoicePDF = async (order: Order, config: InvoiceConfig) => {
+  try {
+    const pdf = await generateInvoicePDF(order, config);
+    const fileName = `invoice-${order.id.slice(-6).toUpperCase()}.pdf`;
+    const blob = pdf.output('blob');
+    const file = new File([blob], fileName, { type: 'application/pdf' });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: `Order #${order.id.slice(-6).toUpperCase()}`,
+        text: `Order details for ${order.customerName}`
+      });
+      return true;
+    } else {
+      // Fallback to download if sharing is not supported
+      pdf.save(fileName);
+      return false;
+    }
+  } catch (error) {
+    console.error('Sharing failed:', error);
+    return false;
   }
 };
