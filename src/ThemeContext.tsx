@@ -12,38 +12,68 @@ interface ThemeConfig {
   accentColor: string;
 }
 
-interface ThemeContextType {
-  config: ThemeConfig;
-  previewConfig: ThemeConfig | null;
-  setPreview: (newConfig: Partial<ThemeConfig> | null) => void;
-  saveConfig: () => Promise<void>;
+interface PlatformConfigs {
+  web: ThemeConfig;
+  mobile: ThemeConfig;
 }
 
-const defaultBotConfig: ThemeConfig = {
+interface ThemeContextType {
+  configs: PlatformConfigs;
+  previewConfig: { platform: 'web' | 'mobile', config: ThemeConfig } | null;
+  setPreview: (platform: 'web' | 'mobile', newConfig: Partial<ThemeConfig> | null) => void;
+  saveConfig: (platform: 'web' | 'mobile') => Promise<void>;
+  isMobileView: boolean;
+  setAdminForcePlatform: (platform: 'web' | 'mobile' | null) => void;
+}
+
+const defaultTheme: ThemeConfig = {
   activeTheme: 'original',
-  primaryColor: '#7E308E', // original purple
-  secondaryColor: '#00A99D', // original teal
-  accentColor: '#D4AF37', // original gold
+  primaryColor: '#7E308E',
+  secondaryColor: '#00A99D',
+  accentColor: '#D4AF37',
+};
+
+const defaultConfigs: PlatformConfigs = {
+  web: { ...defaultTheme },
+  mobile: { ...defaultTheme },
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [config, setConfig] = useState<ThemeConfig>(defaultBotConfig);
-  const [previewConfig, setPreviewConfig] = useState<ThemeConfig | null>(null);
+  const [configs, setConfigs] = useState<PlatformConfigs>(defaultConfigs);
+  const [previewConfig, setPreviewConfig] = useState<{ platform: 'web' | 'mobile', config: ThemeConfig } | null>(null);
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [adminForcePlatform, setAdminForcePlatform] = useState<'web' | 'mobile' | null>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'config', 'theme'), (docSnap) => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'config', 'themes'), (docSnap) => {
       if (docSnap.exists()) {
-        setConfig(docSnap.data() as ThemeConfig);
+        setConfigs(docSnap.data() as PlatformConfigs);
       }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'config/theme'));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'config/themes'));
     return unsub;
   }, []);
 
   useEffect(() => {
-    // Determine which config to apply (Preview has priority)
-    const activeConfig = previewConfig || config;
+    // Determine which config to apply
+    let activeConfig: ThemeConfig;
+    const effectivePlatform = adminForcePlatform || (isMobileView ? 'mobile' : 'web');
+    
+    if (effectivePlatform === 'mobile') {
+      activeConfig = (previewConfig?.platform === 'mobile') ? previewConfig.config : configs.mobile;
+    } else {
+      activeConfig = (previewConfig?.platform === 'web') ? previewConfig.config : configs.web;
+    }
 
     // Apply colors to CSS Variables
     const root = document.documentElement;
@@ -53,26 +83,32 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     
     // Apply Theme specific classes to body
     document.body.className = `theme-${activeConfig.activeTheme}`;
-  }, [config, previewConfig]);
+  }, [configs, previewConfig, isMobileView, adminForcePlatform]);
 
-  const setPreview = (newConfig: Partial<ThemeConfig> | null) => {
+  const setPreview = (platform: 'web' | 'mobile', newConfig: Partial<ThemeConfig> | null) => {
     if (newConfig === null) {
       setPreviewConfig(null);
     } else {
-      setPreviewConfig(prev => ({ ...(prev || config), ...newConfig }));
+      const currentBase = platform === 'web' ? configs.web : configs.mobile;
+      const currentPreview = (previewConfig?.platform === platform) ? previewConfig.config : currentBase;
+      setPreviewConfig({
+        platform,
+        config: { ...currentPreview, ...newConfig }
+      });
     }
   };
 
-  const saveConfig = async () => {
-    if (previewConfig) {
-      await setDoc(doc(db, 'config', 'theme'), previewConfig);
-      setConfig(previewConfig);
+  const saveConfig = async (platform: 'web' | 'mobile') => {
+    if (previewConfig && previewConfig.platform === platform) {
+      const newConfigs = { ...configs, [platform]: previewConfig.config };
+      await setDoc(doc(db, 'config', 'themes'), newConfigs);
+      setConfigs(newConfigs);
       setPreviewConfig(null);
     }
   };
 
   return (
-    <ThemeContext.Provider value={{ config, previewConfig, setPreview, saveConfig }}>
+    <ThemeContext.Provider value={{ configs, previewConfig, setPreview, saveConfig, isMobileView, setAdminForcePlatform }}>
       {children}
     </ThemeContext.Provider>
   );

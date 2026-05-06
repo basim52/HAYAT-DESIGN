@@ -1,4 +1,4 @@
-import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout, MessageSquare, Star } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Save, Image as ImageIcon, Package, Clock, CheckCircle, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Calendar, User, MapPin, Phone, MessageCircle, TrendingUp, BarChart2, Wallet, DollarSign, Scissors, Palette, Layout, MessageSquare, Star, Bell, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useState, useEffect } from 'react';
 import { Product, Category, Order, Testimonial } from '../types';
@@ -25,9 +25,18 @@ export default function AdminPanel({
   heroImage,
 }: AdminPanelProps) {
   const { isAdmin } = useAuth();
-  const { config: themeConfig, previewConfig, setPreview, saveConfig } = useTheme();
-  const currentThemeConfig = previewConfig || themeConfig;
-  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders' | 'theme' | 'testimonials'>('orders');
+  const { configs: themeConfigs, previewConfig, setPreview, saveConfig, setAdminForcePlatform } = useTheme();
+  const [platformTab, setPlatformTab] = useState<'web' | 'mobile'>('web');
+  const currentThemeConfig = (previewConfig?.platform === platformTab) ? previewConfig.config : themeConfigs[platformTab];
+  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'hero' | 'orders' | 'theme' | 'testimonials' | 'notifications'>('orders');
+
+  useEffect(() => {
+    if (activeTab === 'theme' && isOpen) {
+      setAdminForcePlatform(platformTab);
+    } else {
+      setAdminForcePlatform(null);
+    }
+  }, [activeTab, platformTab, isOpen]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [isAddingTestimonial, setIsAddingTestimonial] = useState(false);
   const [editingTestimonialId, setEditingTestimonialId] = useState<string | null>(null);
@@ -45,6 +54,22 @@ export default function AdminPanel({
   const [banners, setBanners] = useState<{ id: string; image: string; title?: string; subtitle?: string; active: boolean }[]>([]);
   const [isAddingBanner, setIsAddingBanner] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notifSettings, setNotifSettings] = useState<any>({
+    cartReminderEnabled: false,
+    cartReminderMinutes: 15,
+    cartReminderTitle: 'سلة المشتريات تنتظرك!',
+    cartReminderMessage: 'لديك منتجات رائعة في سلتك، لا تفوت فرصة اقتنائها الآن.',
+    maxReminders: 3
+  });
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [isAddingAnnouncement, setIsAddingAnnouncement] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+  const [newAnnouncement, setNewAnnouncement] = useState<any>({
+    title: '',
+    message: '',
+    type: 'popup',
+    active: true
+  });
 
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
     name: '',
@@ -94,10 +119,24 @@ export default function AdminPanel({
         setTestimonials(docs);
       }, (error) => handleFirestoreError(error, OperationType.GET, 'testimonials'));
 
+      const unsubNotifSettings = onSnapshot(doc(db, 'config', 'notifications'), (snap) => {
+        if (snap.exists()) {
+          setNotifSettings(snap.data());
+        }
+      }, (err) => handleFirestoreError(err, OperationType.GET, 'config/notifications'));
+
+      const qAnnouncements = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
+      const unsubAnnouncements = onSnapshot(qAnnouncements, (snap) => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAnnouncements(docs);
+      }, (err) => handleFirestoreError(err, OperationType.GET, 'announcements'));
+
       return () => {
         unsubOrders();
         unsubBanners();
         unsubTestimonials();
+        unsubNotifSettings();
+        unsubAnnouncements();
       };
     }
   }, [isOpen, isAdmin]);
@@ -299,6 +338,50 @@ export default function AdminPanel({
     }
   };
 
+  const handleSaveNotifSettings = async () => {
+    try {
+      setIsSubmitting(true);
+      await setDoc(doc(db, 'config', 'notifications'), notifSettings);
+      alert('تم حفظ إعدادات الإشعارات بنجاح');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'config/notifications');
+      alert('خطأ أثناء حفظ الإعدادات');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSubmitting(true);
+      const data = { ...newAnnouncement, createdAt: new Date().toISOString() };
+      if (editingAnnouncementId) {
+        await updateDoc(doc(db, 'announcements', editingAnnouncementId), data);
+        setEditingAnnouncementId(null);
+      } else {
+        await addDoc(collection(db, 'announcements'), data);
+      }
+      setIsAddingAnnouncement(false);
+      setNewAnnouncement({ title: '', message: '', type: 'popup', active: true });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'announcements');
+      alert('خطأ أثناء حفظ الإعلان');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا الإعلان؟')) {
+      try {
+        await deleteDoc(doc(db, 'announcements', id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `announcements/${id}`);
+      }
+    }
+  };
+
   // Inline edit for category
   const handleUpdateCategory = async (id: string, updates: Partial<Category>) => {
     try {
@@ -416,6 +499,15 @@ export default function AdminPanel({
                   >
                     آراء العملاء
                   </button>
+                  <button 
+                    onClick={() => setActiveTab('notifications')}
+                    className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeTab === 'notifications' ? 'bg-brand-purple text-white' : 'text-gray-400 hover:text-charcoal'}`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Bell className="w-3.5 h-3.5" />
+                      إشعارات
+                    </div>
+                  </button>
                 </div>
                 <button onClick={onClose} className="p-3 bg-white hover:bg-red-50 hover:text-red-500 rounded-full border border-border-subtle transition-all">
                   <X className="w-5 h-5" />
@@ -430,7 +522,7 @@ export default function AdminPanel({
                   <div className="max-w-4xl mx-auto space-y-12 pb-20">
                     {/* Save/Cancel Preview Bar */}
                     <AnimatePresence>
-                      {previewConfig && (
+                      {previewConfig && previewConfig.platform === platformTab && (
                         <motion.div 
                           initial={{ opacity: 0, y: 50 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -438,13 +530,13 @@ export default function AdminPanel({
                           className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-charcoal text-white p-6 rounded-[30px] border border-white/10 shadow-2xl flex items-center gap-8 z-[100] backdrop-blur-xl"
                         >
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-brand-teal uppercase tracking-widest">نمط المعاينة نشط</span>
+                            <span className="text-[10px] font-black text-brand-teal uppercase tracking-widest">نمط المعاينة نشط ({platformTab})</span>
                             <span className="text-xs font-bold text-gray-300">أنت تشاهد الثيم الآن، هل ترغب في اعتماده؟</span>
                           </div>
                           <div className="flex gap-3">
                             <button 
                               onClick={() => {
-                                saveConfig();
+                                saveConfig(platformTab);
                               }}
                               className="px-6 py-3 bg-brand-purple hover:bg-brand-purple/90 text-white rounded-2xl font-bold text-xs transition-all flex items-center gap-2"
                             >
@@ -452,7 +544,7 @@ export default function AdminPanel({
                               <span>حفظ واعتماد</span>
                             </button>
                             <button 
-                              onClick={() => setPreview(null)}
+                              onClick={() => setPreview(platformTab, null)}
                               className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-bold text-xs transition-all"
                             >
                               إلغاء والرجوع للسابق
@@ -462,9 +554,28 @@ export default function AdminPanel({
                       )}
                     </AnimatePresence>
 
-                    <div className="flex flex-col">
-                      <h3 className="text-2xl font-black text-brand-purple">تخصيص مظهر المتجر</h3>
-                      <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">اختر الثيم المناسب وتحكم في الألوان الأساسية</p>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="flex flex-col">
+                        <h3 className="text-2xl font-black text-brand-purple">تخصيص مظهر المتجر</h3>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">اختر الثيم المناسب وتحكم في الألوان الأساسية</p>
+                      </div>
+
+                      <div className="flex bg-muted-bg p-1 rounded-2xl border border-border-subtle">
+                        <button 
+                          onClick={() => setPlatformTab('web')}
+                          className={`px-8 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${platformTab === 'web' ? 'bg-white text-brand-purple shadow-sm ring-1 ring-black/5' : 'text-gray-400 hover:text-charcoal'}`}
+                        >
+                          <Layout className="w-4 h-4" />
+                          <span>نسخة الويب</span>
+                        </button>
+                        <button 
+                          onClick={() => setPlatformTab('mobile')}
+                          className={`px-8 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${platformTab === 'mobile' ? 'bg-white text-brand-teal shadow-sm ring-1 ring-black/5' : 'text-gray-400 hover:text-charcoal'}`}
+                        >
+                          <Phone className="w-4 h-4" />
+                          <span>نسخة الجوال</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Theme Selection */}
@@ -472,7 +583,7 @@ export default function AdminPanel({
                       {(['original', 'classic', 'modern', 'creative'] as const).map((t) => (
                         <button
                           key={t}
-                          onClick={() => setPreview({ activeTheme: t })}
+                          onClick={() => setPreview(platformTab, { activeTheme: t })}
                           className={`p-6 rounded-[40px] border-2 transition-all text-right relative overflow-hidden group ${
                             currentThemeConfig.activeTheme === t 
                               ? 'border-brand-purple bg-white shadow-xl shadow-brand-purple/10' 
@@ -481,7 +592,7 @@ export default function AdminPanel({
                         >
                           <div className="flex items-center justify-between mb-4">
                             <div className={`p-3 rounded-2xl ${currentThemeConfig.activeTheme === t ? 'bg-brand-purple text-white' : 'bg-muted-bg text-gray-400'}`}>
-                              <Layout className="w-5 h-5" />
+                              <Palette className="w-5 h-5" />
                             </div>
                             {currentThemeConfig.activeTheme === t && (
                               <div className="bg-brand-teal text-white p-1 rounded-full">
@@ -490,10 +601,10 @@ export default function AdminPanel({
                             )}
                           </div>
                           <h4 className="font-black text-sm capitalize">
-                            {t === 'original' ? 'التصميم الأصلي (Basic)' : t === 'classic' ? 'الملكي (Classic)' : t === 'modern' ? 'العصري (Modern)' : 'الإبداعي (Creative)'}
+                            {t === 'original' ? 'التصميم الأصلي' : t === 'classic' ? 'الملكي' : t === 'modern' ? 'العصري' : 'الإبداعي'}
                           </h4>
                           <p className="text-[10px] text-gray-400 font-bold mt-2 leading-relaxed">
-                            {t === 'original' ? 'التصميم المعتمد والأساسي للمتجر بكل تفاصيله.' : t === 'classic' ? 'لمسات فخمة وخطوط كلاسيكية تناسب الأعمال الراقية.' : t === 'modern' ? 'تصميم بسيط بخطوط حادة وواضحة يركز على المحتوى.' : 'تصميم ملهم بأشكال دائرية وألوان نابضة بالحياة.'}
+                            {t === 'original' ? 'التصميم المعتمد والأساسي للمتجر.' : t === 'classic' ? 'لمسات فخمة وخطوط راقية.' : t === 'modern' ? 'تصميم عصري بخطوط حادة وواضحة.' : 'تصميم ملهم بأشكال دائرية.'}
                           </p>
                         </button>
                       ))}
@@ -503,59 +614,59 @@ export default function AdminPanel({
                     <div className="bg-white p-10 rounded-[50px] border border-border-subtle shadow-sm space-y-8">
                       <div className="flex items-center gap-3 border-b border-border-subtle pb-6">
                         <Palette className="w-6 h-6 text-brand-purple" />
-                        <h4 className="font-black text-xl">لوحة الألوان المخصصة</h4>
+                        <h4 className="font-black text-xl">لوحة ألوان {platformTab === 'web' ? 'الويب' : 'الجوال'}</h4>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                         <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">اللون الأساسي (Primary)</label>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">اللون الأساسي</label>
                           <div className="flex items-center gap-4">
                             <input 
                               type="color" 
                               value={currentThemeConfig.primaryColor}
-                              onChange={(e) => setPreview({ primaryColor: e.target.value })}
+                              onChange={(e) => setPreview(platformTab, { primaryColor: e.target.value })}
                               className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
                             />
                             <input 
                               type="text"
                               value={currentThemeConfig.primaryColor}
-                              onChange={(e) => setPreview({ primaryColor: e.target.value })}
+                              onChange={(e) => setPreview(platformTab, { primaryColor: e.target.value })}
                               className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
                             />
                           </div>
                         </div>
 
                         <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">اللون الثانوي (Secondary)</label>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">اللون الثانوي</label>
                           <div className="flex items-center gap-4">
                             <input 
                               type="color" 
                               value={currentThemeConfig.secondaryColor}
-                              onChange={(e) => setPreview({ secondaryColor: e.target.value })}
+                              onChange={(e) => setPreview(platformTab, { secondaryColor: e.target.value })}
                               className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
                             />
                             <input 
                               type="text"
                               value={currentThemeConfig.secondaryColor}
-                              onChange={(e) => setPreview({ secondaryColor: e.target.value })}
+                              onChange={(e) => setPreview(platformTab, { secondaryColor: e.target.value })}
                               className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
                             />
                           </div>
                         </div>
 
                         <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">لون التمييز (Accent)</label>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">لون التمييز</label>
                           <div className="flex items-center gap-4">
                             <input 
                               type="color" 
                               value={currentThemeConfig.accentColor}
-                              onChange={(e) => setPreview({ accentColor: e.target.value })}
+                              onChange={(e) => setPreview(platformTab, { accentColor: e.target.value })}
                               className="w-16 h-16 rounded-2xl border-none cursor-pointer outline-none overflow-hidden"
                             />
                             <input 
                               type="text"
                               value={currentThemeConfig.accentColor}
-                              onChange={(e) => setPreview({ accentColor: e.target.value })}
+                              onChange={(e) => setPreview(platformTab, { accentColor: e.target.value })}
                               className="flex-1 p-4 bg-muted-bg rounded-2xl text-[10px] font-mono outline-none"
                             />
                           </div>
@@ -1446,6 +1557,198 @@ export default function AdminPanel({
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+                {activeTab === 'notifications' && (
+                  <div className="max-w-4xl mx-auto space-y-12 pb-20 text-right">
+                    <div className="flex flex-col">
+                      <h3 className="text-2xl font-black text-brand-purple">إدارة الإشعارات والرسائل</h3>
+                      <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">تحكم في تنبيهات السلة المهجورة والرسائل المنبثقة</p>
+                    </div>
+
+                    {/* Cart Reminder Settings */}
+                    <div className="bg-white p-10 rounded-[50px] border border-border-subtle shadow-sm space-y-8">
+                      <div className="flex items-center justify-between border-b border-border-subtle pb-6">
+                        <div className="flex items-center gap-3">
+                          <ShoppingCart className="w-6 h-6 text-brand-purple" />
+                          <h4 className="font-black text-xl">تنبيه السلة المهجورة</h4>
+                        </div>
+                        <button
+                          onClick={() => setNotifSettings({ ...notifSettings, cartReminderEnabled: !notifSettings.cartReminderEnabled })}
+                          className={`w-14 h-8 rounded-full transition-all relative ${notifSettings.cartReminderEnabled ? 'bg-brand-teal' : 'bg-gray-200'}`}
+                        >
+                          <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${notifSettings.cartReminderEnabled ? 'left-1' : 'left-7'}`} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">وقت التذكير (بالدقائق)</label>
+                          <input 
+                            type="number"
+                            value={notifSettings.cartReminderMinutes}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, cartReminderMinutes: parseInt(e.target.value) })}
+                            className="w-full p-4 bg-muted-bg rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-purple"
+                          />
+                        </div>
+                        <div className="space-y-4">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">أقصى عدد للتنبيهات</label>
+                          <input 
+                            type="number"
+                            value={notifSettings.maxReminders}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, maxReminders: parseInt(e.target.value) })}
+                            className="w-full p-4 bg-muted-bg rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-purple"
+                          />
+                        </div>
+                        <div className="space-y-4 md:col-span-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">عنوان التنبيه</label>
+                          <input 
+                            type="text"
+                            value={notifSettings.cartReminderTitle}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, cartReminderTitle: e.target.value })}
+                            className="w-full p-4 bg-muted-bg rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-purple"
+                            dir="rtl"
+                          />
+                        </div>
+                        <div className="space-y-4 md:col-span-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block px-1">رسالة التنبيه</label>
+                          <textarea 
+                            value={notifSettings.cartReminderMessage}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, cartReminderMessage: e.target.value })}
+                            className="w-full p-4 bg-muted-bg rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-purple h-24 resize-none"
+                            dir="rtl"
+                          />
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={handleSaveNotifSettings}
+                        disabled={isSubmitting}
+                        className="w-full py-4 bg-brand-purple text-white rounded-2xl font-black text-xs hover:bg-brand-purple/90 transition-all flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        حفظ إعدادات التنبيه
+                      </button>
+                    </div>
+
+                    {/* Announcements Section */}
+                    <div className="bg-white p-10 rounded-[50px] border border-border-subtle shadow-sm space-y-8">
+                      <div className="flex items-center justify-between border-b border-border-subtle pb-6 text-right">
+                        <div className="flex items-center gap-3">
+                          <MessageSquare className="w-6 h-6 text-brand-teal" />
+                          <h4 className="font-black text-xl">الإعلانات والرسائل المنبثقة</h4>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setEditingAnnouncementId(null);
+                            setNewAnnouncement({ title: '', message: '', type: 'popup', active: true });
+                            setIsAddingAnnouncement(true);
+                          }}
+                          className="flex items-center gap-2 bg-brand-teal text-white px-6 py-3 rounded-2xl font-bold text-xs hover:opacity-90 transition-opacity"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>إعلان جديد</span>
+                        </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {isAddingAnnouncement && (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-muted-bg/50 p-8 rounded-[40px] border-2 border-dashed border-brand-teal/30"
+                          >
+                            <form onSubmit={handleAddAnnouncement} className="space-y-6">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">عنوان الإعلان</label>
+                                  <input 
+                                    required
+                                    type="text"
+                                    value={newAnnouncement.title}
+                                    onChange={e => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                                    className="w-full p-4 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal"
+                                    dir="rtl"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">نوع الإنشعار</label>
+                                  <select 
+                                    value={newAnnouncement.type}
+                                    onChange={e => setNewAnnouncement({ ...newAnnouncement, type: e.target.value as any })}
+                                    className="w-full p-4 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal appearance-none"
+                                  >
+                                    <option value="popup">منبثق (Popup)</option>
+                                    <option value="banner">شريط (Banner)</option>
+                                  </select>
+                                </div>
+                                <div className="space-y-2 md:col-span-2">
+                                  <label className="text-[10px] font-bold text-gray-400 px-1 uppercase tracking-widest">محتوى الرسالة</label>
+                                  <textarea 
+                                    required
+                                    value={newAnnouncement.message}
+                                    onChange={e => setNewAnnouncement({ ...newAnnouncement, message: e.target.value })}
+                                    className="w-full p-4 bg-white rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-brand-teal h-24 resize-none"
+                                    dir="rtl"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex gap-3">
+                                <button type="submit" disabled={isSubmitting} className="flex-1 bg-brand-teal text-white py-4 rounded-2xl font-black text-xs">
+                                  {editingAnnouncementId ? 'تحديث الإعلان' : 'نشر الإعلان'}
+                                </button>
+                                <button type="button" onClick={() => setIsAddingAnnouncement(false)} className="flex-1 bg-white text-gray-400 py-4 rounded-2xl font-black text-xs border border-border-subtle">
+                                  إلغاء
+                                </button>
+                              </div>
+                            </form>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <div className="space-y-4">
+                        {announcements.map((ann) => (
+                          <div key={ann.id} className="bg-muted-bg/30 p-6 rounded-3xl border border-border-subtle flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-2xl ${ann.active ? 'bg-brand-teal text-white' : 'bg-gray-200 text-gray-400'}`}>
+                                <Bell className="w-5 h-5" />
+                              </div>
+                              <div className="flex flex-col">
+                                <h5 className="font-black text-sm">{ann.title}</h5>
+                                <p className="text-[10px] text-gray-400 font-bold">{ann.active ? 'نشط الآن' : 'غير نشط'}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => {
+                                  setEditingAnnouncementId(ann.id);
+                                  setNewAnnouncement(ann);
+                                  setIsAddingAnnouncement(true);
+                                }}
+                                className="p-2 text-gray-400 hover:text-brand-purple transition-colors"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteAnnouncement(ann.id)}
+                                className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  await updateDoc(doc(db, 'announcements', ann.id), { active: !ann.active });
+                                }}
+                                className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${ann.active ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20'}`}
+                              >
+                                {ann.active ? 'إيقاف' : 'تفعيل'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

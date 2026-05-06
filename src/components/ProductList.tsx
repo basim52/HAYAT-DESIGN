@@ -30,20 +30,20 @@ export default function ProductList({
   if (products.length === 0) return null;
 
   return (
-    <section className="py-24 bg-gold-light/20 border-b border-gold/5 last:border-0">
-      <div className="container mx-auto px-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 text-right">
+    <section className="py-12 md:py-24 bg-gold-light/20 border-b border-gold/5 last:border-0 overflow-hidden">
+      <div className="container mx-auto px-4 md:px-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 md:mb-16 gap-6 md:gap-8 text-right">
           <div>
             <motion.h2
               initial={{ opacity: 0, x: 20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              className="text-3xl md:text-5xl font-extrabold mb-4 tracking-tighter"
+              className="text-2xl md:text-5xl font-extrabold mb-3 md:mb-4 tracking-tighter"
             >
               {title} <br />
               <span className="text-gold">{subtitle}</span>
             </motion.h2>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">أحدث ما أنتجته ورشنا الفنية بدقة وحب</p>
+            <p className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest leading-relaxed">أحدث ما أنتجته ورشنا الفنية بدقة وحب</p>
           </div>
           
           {showFilters && (
@@ -51,13 +51,13 @@ export default function ProductList({
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="flex flex-wrap gap-2 md:gap-3 flex-row-reverse bg-white/50 p-2 rounded-[28px] border border-border-subtle lux-shadow backdrop-blur-sm self-center md:self-end"
+              className="flex items-center gap-2 md:gap-3 flex-row-reverse bg-white/50 p-1.5 md:p-2 rounded-[28px] border border-border-subtle lux-shadow backdrop-blur-sm self-center md:self-end overflow-x-auto no-scrollbar max-w-full"
             >
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveTab(cat)}
-                  className={`relative px-6 md:px-8 py-3 rounded-[22px] text-[10px] md:text-xs font-black uppercase tracking-widest transition-all duration-300 z-10 ${
+                  className={`relative px-4 md:px-8 py-2 md:py-3 rounded-[22px] text-[9px] md:text-xs font-black uppercase tracking-widest transition-all duration-300 z-10 whitespace-nowrap ${
                     activeTab === cat 
                       ? 'text-white' 
                       : 'text-gray-400 hover:text-brand-purple'
@@ -70,14 +70,7 @@ export default function ProductList({
                       transition={{ type: "spring", bounce: 0.25, duration: 0.6 }}
                     />
                   )}
-                  {activeTab === cat && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute -top-1 -right-1 w-2 h-2 bg-brand-teal rounded-full border-2 border-white"
-                    />
-                  )}
-                  <span className="relative z-20 whitespace-nowrap">{cat}</span>
+                  <span className="relative z-20">{cat}</span>
                 </button>
               ))}
             </motion.div>
@@ -86,7 +79,7 @@ export default function ProductList({
 
         <motion.div 
           layout
-          className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8"
+          className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-8"
         >
           <AnimatePresence mode="popLayout">
             {(showFilters ? filteredProducts : products).map((product, index) => (

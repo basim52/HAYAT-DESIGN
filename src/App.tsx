@@ -5,6 +5,10 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Navbar from './components/Navbar';
+import BottomNav from './components/BottomNav';
+import SearchMobile from './components/SearchMobile';
+import MobileCategoryBar from './components/MobileCategoryBar';
+import NotificationManager from './components/NotificationManager';
 import Hero from './components/Hero';
 import Features from './components/Features';
 import Categories from './components/Categories';
@@ -37,6 +41,7 @@ export default function App() {
   const [heroImage, setHeroImage] = useState('https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=800&auto=format&fit=crop');
   const [banners, setBanners] = useState<{ id: string; image: string; title?: string; subtitle?: string; active: boolean }[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Firestore Sync
   useEffect(() => {
@@ -147,6 +152,11 @@ export default function App() {
     setIsCheckoutOpen(true);
   };
 
+  const filteredProductsWithSearch = products.filter(product => 
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen">
       <Navbar 
@@ -158,7 +168,12 @@ export default function App() {
         onCategoryClick={scrollToCategory}
       />
       
-      <main className="pt-20">
+      <main className="pt-20 pb-24 md:pb-0">
+        <SearchMobile onSearch={setSearchQuery} />
+        <MobileCategoryBar 
+          categories={categories}
+          onCategoryClick={scrollToCategory}
+        />
         <Hero 
           onShopClick={() => handleNavClick('products')} 
           heroImage={heroImage}
@@ -172,17 +187,17 @@ export default function App() {
         {/* All Products Section with Filters */}
         <div id="products">
           <ProductList 
-            title="جميع"
-            subtitle="المنتجات"
-            products={products}
+            title={searchQuery ? `نتائج البحث عن: ${searchQuery}` : "جميع"}
+            subtitle={searchQuery ? "" : "المنتجات"}
+            products={filteredProductsWithSearch}
             onAddToCart={handleAddToCart} 
-            showFilters={true}
+            showFilters={!searchQuery}
           />
         </div>
 
         {/* Individual Category Sections */}
-        {categories.map((category) => {
-          const categoryProducts = products.filter(p => p.category === category.name);
+        {!searchQuery && categories.map((category) => {
+          const categoryProducts = filteredProductsWithSearch.filter(p => p.category === category.name);
           if (categoryProducts.length === 0) return null;
           
           return (
@@ -244,14 +259,25 @@ export default function App() {
         href={`https://wa.me/${BANK_DETAILS.whatsappNumber}`}
         target="_blank"
         rel="noreferrer"
-        className="fixed bottom-8 right-8 z-[90] w-16 h-16 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-all duration-300 group"
+        className="fixed bottom-24 right-6 md:bottom-8 md:right-8 z-[90] w-14 h-14 md:w-16 md:h-16 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-all duration-300 group"
         aria-label="Contact on WhatsApp"
       >
-        <MessageCircle className="w-8 h-8 fill-white/20" />
-        <div className="absolute right-full mr-4 bg-white px-4 py-2 rounded-2xl shadow-xl text-charcoal text-xs font-black whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+        <MessageCircle className="w-7 h-7 md:w-8 md:h-8 fill-white/20" />
+        <div className="absolute right-full mr-4 bg-white px-4 py-2 rounded-2xl shadow-xl text-charcoal text-xs font-black whitespace-nowrap opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
           تواصل معنا عبر الواتساب
         </div>
       </a>
+
+      <BottomNav 
+        onNavClick={handleNavClick}
+        onCartClick={() => setIsCartOpen(true)}
+        cartCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)}
+      />
+
+      <NotificationManager 
+        cartCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)}
+        onOpenCart={() => setIsCartOpen(true)}
+      />
     </div>
   );
 }

@@ -30,13 +30,13 @@ export default function Hero({ onShopClick, heroImage, banners = [] }: HeroProps
   const currentBanner = banners[currentIndex];
 
   return (
-    <section id="home" className="py-12 md:py-20 lg:py-24">
-      <div className="container mx-auto px-6">
+    <section id="home" className="py-6 md:py-20 lg:py-24">
+      <div className="container mx-auto px-4 md:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="bg-white p-8 md:p-16 rounded-[40px] border border-border-subtle flex flex-col md:flex-row items-center gap-12 shadow-sm relative overflow-hidden min-h-[500px]"
+          className="bg-white p-6 md:p-16 rounded-[32px] md:rounded-[40px] border border-border-subtle flex flex-col md:flex-row items-center gap-8 md:gap-12 shadow-sm relative overflow-hidden min-h-[400px] md:min-h-[500px]"
         >
           {/* Subtle background flair */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-gold/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />

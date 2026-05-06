@@ -33,7 +33,7 @@ export default function Navbar({ cartCount, onCartClick, onNavClick, onLoginClic
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 glass-morphism py-4 px-8 flex items-center justify-between">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-border-subtle py-4 px-8 flex items-center justify-between">
       <div className="flex items-center gap-10">
         <div 
           className="flex items-center gap-3 cursor-pointer"
@@ -170,7 +170,7 @@ export default function Navbar({ cartCount, onCartClick, onNavClick, onLoginClic
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 h-full w-[280px] bg-white z-[70] p-8 lux-shadow"
+              className="fixed top-0 right-0 h-full w-[280px] bg-white z-[100] p-8 shadow-2xl"
             >
               <div className="flex justify-between items-center mb-12">
                 <span className="text-xl font-bold font-display">القائمة</span>

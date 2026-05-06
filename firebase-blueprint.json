@@ -73,6 +73,31 @@
         "date": { "type": "string", "format": "date" }
       },
       "required": ["customerName", "content", "rating", "date"]
+    },
+    "NotificationSettings": {
+      "title": "Notification Settings",
+      "description": "Admin configuration for cart reminders and popups.",
+      "type": "object",
+      "properties": {
+        "cartReminderEnabled": { "type": "boolean" },
+        "cartReminderMinutes": { "type": "number" },
+        "cartReminderTitle": { "type": "string" },
+        "cartReminderMessage": { "type": "string" },
+        "maxReminders": { "type": "number" }
+      }
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Broadcast message or popup for all users.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["popup", "banner"] },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "message", "type", "active"]
     }
   },
   "firestore": {
@@ -95,6 +120,14 @@
     "/config/general": {
       "schema": "AppConfig",
       "description": "Global settings."
+    },
+    "/config/notifications": {
+      "schema": "NotificationSettings",
+      "description": "Notification configuration."
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Global announcements and popups."
     },
     "/testimonials/{testimonialId}": {
       "schema": "Testimonial",
