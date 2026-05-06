@@ -4,6 +4,7 @@ import { doc, collection, onSnapshot, query, where, orderBy, limit } from 'fireb
 import ToastNotification, { ToastNotificationProps } from './ToastNotification';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Announcement } from '../types';
+import { useTheme } from '../ThemeContext';
 
 interface ReminderStage {
   id: string;
@@ -23,11 +24,10 @@ interface NotificationManagerProps {
 }
 
 export default function NotificationManager({ cartCount, onOpenCart }: NotificationManagerProps) {
+  const { isMobileView } = useTheme();
+  const currentPlatform = isMobileView ? 'mobile' : 'web';
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [showToast, setShowToast] = useState(false);
-  const [currentPlatform, setCurrentPlatform] = useState<'web' | 'mobile'>(
-    typeof window !== 'undefined' ? (window.innerWidth <= 768 ? 'mobile' : 'web') : 'web'
-  );
   const [toastData, setToastData] = useState({ 
     title: '', 
     message: '', 
@@ -42,19 +42,6 @@ export default function NotificationManager({ cartCount, onOpenCart }: Notificat
   const remindersTimers = useRef<NodeJS.Timeout[]>([]);
   const shownReminders = useRef<Set<string>>(new Set());
   const lastCartCount = useRef(cartCount);
-
-  // Platform detection
-  useEffect(() => {
-    const checkPlatform = () => {
-      const isMobile = window.innerWidth <= 768;
-      setCurrentPlatform(prev => {
-        const next = isMobile ? 'mobile' : 'web';
-        return prev === next ? prev : next;
-      });
-    };
-    window.addEventListener('resize', checkPlatform);
-    return () => window.removeEventListener('resize', checkPlatform);
-  }, []);
 
   // Fetch Settings
   useEffect(() => {
