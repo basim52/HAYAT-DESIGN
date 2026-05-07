@@ -186,12 +186,19 @@ export const shareInvoicePDF = async (order: Order, config: InvoiceConfig) => {
       `مرفق فاتورة الطلب (PDF).`;
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `فاتورة طلب #${order.id.slice(-6).toUpperCase()}`,
-        text: shareText
-      });
-      return true;
+      try {
+        await navigator.share({
+          files: [file],
+          title: `فاتورة طلب #${order.id.slice(-6).toUpperCase()}`,
+          text: shareText
+        });
+        return true;
+      } catch (shareErr) {
+        // If share fails (e.g. gesture expired or cancelled), fallback to download
+        console.warn('Native share failed or cancelled:', shareErr);
+        pdf.save(fileName);
+        return false;
+      }
     } else {
       // Fallback: Download and return false so caller can handle WhatsApp text fallback
       pdf.save(fileName);

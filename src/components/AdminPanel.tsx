@@ -660,6 +660,16 @@ export default function AdminPanel({
     }
   };
 
+  const getStatusActiveColor = (status: Order['status']) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-500 text-white border-transparent';
+      case 'processing': return 'bg-blue-500 text-white border-transparent';
+      case 'completed': return 'bg-green-500 text-white border-transparent';
+      case 'cancelled': return 'bg-red-500 text-white border-transparent';
+      default: return 'bg-charcoal text-white border-transparent';
+    }
+  };
+
   const getStatusLabel = (status: Order['status']) => {
     switch (status) {
       case 'pending': return 'قيد الانتظار';
@@ -1719,11 +1729,21 @@ export default function AdminPanel({
                                               <ExternalLink className="w-3 h-3" />
                                             </a>
                                           </div>
-                                          <div className="flex flex-col gap-1 text-xs">
-                                            <span className="text-gray-400">المدينة والعنوان:</span>
-                                            <span className="font-bold leading-relaxed">
-                                              {order.city && `${order.city} - `}{order.address}
-                                            </span>
+                                          <div className="flex flex-col gap-2 text-xs">
+                                            <div className="flex flex-col gap-1">
+                                              <span className="text-gray-400">المدينة:</span>
+                                              <span className="font-bold">{order.city || 'غير محدد'}</span>
+                                            </div>
+                                            <div className="flex flex-col gap-1">
+                                              <span className="text-gray-400">العنوان الكامل:</span>
+                                              <span className="font-bold leading-relaxed">{order.address}</span>
+                                            </div>
+                                            {order.shortAddress && (
+                                              <div className="flex flex-col gap-1 p-3 bg-brand-purple/5 rounded-xl border border-brand-purple/10">
+                                                <span className="text-[10px] font-black text-brand-purple uppercase tracking-widest">العنوان المختصر (العنوان الوطني)</span>
+                                                <span className="font-mono font-bold text-charcoal">{order.shortAddress}</span>
+                                              </div>
+                                            )}
                                           </div>
                                           {order.paymentMethod && (
                                             <div className="flex justify-between items-center text-xs pt-2 border-t border-dashed border-gray-100">
@@ -1739,13 +1759,21 @@ export default function AdminPanel({
                                           <AlertCircle className="w-3 h-3" />
                                           إدارة حالة الطلب
                                         </h5>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-2 gap-3">
                                           {(['pending', 'processing', 'completed', 'cancelled'] as Order['status'][]).map((s) => (
                                             <button 
                                               key={s}
                                               onClick={() => handleUpdateOrderStatus(order.id, s)}
-                                              className={`py-3 px-4 rounded-xl text-[10px] font-bold transition-all border ${order.status === s ? getStatusColor(s) + ' ring-2 ring-offset-2 ring-offset-muted-bg' : 'bg-white border-border-subtle text-gray-400 hover:border-gray-300'}`}
+                                              className={`py-4 px-4 rounded-2xl text-[11px] font-black transition-all border-2 flex items-center justify-center gap-2 ${
+                                                order.status === s 
+                                                  ? `${getStatusActiveColor(s)} shadow-lg scale-[1.02]` 
+                                                  : 'bg-white border-border-subtle text-gray-400 hover:border-gray-300'
+                                              }`}
                                             >
+                                              {s === 'pending' && <Clock className="w-3.5 h-3.5" />}
+                                              {s === 'processing' && <Package className="w-3.5 h-3.5" />}
+                                              {s === 'completed' && <CheckCircle className="w-3.5 h-3.5" />}
+                                              {s === 'cancelled' && <AlertCircle className="w-3.5 h-3.5" />}
                                               {getStatusLabel(s)}
                                             </button>
                                           ))}

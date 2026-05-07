@@ -222,23 +222,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
         });
       }
 
-      // Automatically attempt to share/send PDF Invoice
-      if (invoiceConfig) {
-        const shared = await shareInvoicePDF(orderData as Order, invoiceConfig);
-        if (!shared) {
-          // If native sharing failed (e.g. on Desktop), the helper already downloaded the file.
-          // Now just open WhatsApp with a text message.
-          const waMessage = `*طلب جديد من حياة ديزاين*\n\n` +
-            `رقم الطلب: #${orderData.id.slice(-6).toUpperCase()}\n` +
-            `الاسم: ${orderData.customerName}\n` +
-            `الإجمالي: ${orderData.total} ر.س\n\n` +
-            `*تم تحميل الفاتورة (PDF) تلقائياً، يرجى إرفاقها هنا لإتمام الطلب.*`;
-          
-          const waUrl = `https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodeURIComponent(waMessage)}`;
-          window.open(waUrl, '_blank');
-        }
-      }
-
+      // Trigger Success Screen
       onSuccess?.();
       setShowSuccess(true);
     } catch (err) {
@@ -278,23 +262,27 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                 <div className="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="w-12 h-12" />
                 </div>
-                <h2 className="text-3xl font-bold">تم تسجيل طلبك!</h2>
+                <h2 className="text-3xl font-bold">تم تسجيل طلبك بنجاح!</h2>
                 <p className="text-gray-500 max-w-sm mx-auto">
-                  لقد حفظنا بيانات طلبك بنجاح. تم إصدار الفاتورة وتجهيز محادثة الواتساب لإرسالها للمتجر لإكمال الطلب.
+                  تم إصدار الفاتورة تلقائياً. يرجى إرسالها الآن للمتجر عبر واتساب لإتمام تأكيد طلبك.
                 </p>
                 <div className="flex flex-col gap-3 max-w-xs mx-auto">
                   {lastPlacedOrder && invoiceConfig && (
                     <div className="space-y-4 w-full">
                       <div className="space-y-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">مشاركة الطلب (PDF)</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">الخطوة الأخيرة</p>
                         <button 
                           onClick={async () => {
                             setIsGeneratingInvoice(true);
                             try {
                               const shared = await shareInvoicePDF(lastPlacedOrder, invoiceConfig);
                               if (!shared) {
-                                // Fallback if browser blocks automatic opening
-                                const waMessage = `*تفاصيل طلبي #${lastPlacedOrder.id.slice(-6).toUpperCase()}*`;
+                                // Fallback if native sharing fails (e.g. gesture expired or desktop)
+                                const waMessage = `*طلب جديد من حياة ديزاين*\n\n` +
+                                  `رقم الطلب: #${lastPlacedOrder.id.slice(-6).toUpperCase()}\n` +
+                                  `الاسم: ${lastPlacedOrder.customerName}\n` +
+                                  `الإجمالي: ${lastPlacedOrder.total} ر.س\n\n` +
+                                  `*تم تحميل الفاتورة (PDF) تلقائياً، يرجى إرفاقها هنا ومشاركة صورة الإيصال لإتمام الطلب.*`;
                                 window.open(`https://wa.me/${BANK_DETAILS.whatsappNumber}?text=${encodeURIComponent(waMessage)}`, '_blank');
                               }
                             } finally {
@@ -302,15 +290,14 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                             }
                           }}
                           disabled={isGeneratingInvoice}
-                          className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-600/20 w-full"
+                          className="flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 transition-all scale-[1.02] shadow-xl shadow-green-600/30 w-full group"
                         >
-                          {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5" />}
-                          مشاركة الفاتورة في واتساب
+                          {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />}
+                          إرسال الفاتورة للمتجر (واتساب)
                         </button>
                       </div>
 
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">خيارات إضافية</p>
+                      <div className="space-y-2 pt-2">
                         <button
                           onClick={async () => {
                             setIsGeneratingInvoice(true);
@@ -322,12 +309,16 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, cartItems, u
                             }
                           }}
                           disabled={isGeneratingInvoice}
-                          className="flex items-center justify-center gap-2 px-6 py-4 bg-white border border-brand-purple text-brand-purple rounded-2xl font-bold hover:bg-brand-purple/5 transition-colors shadow-sm w-full"
+                          className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-brand-purple/20 text-brand-purple/60 rounded-xl text-[10px] font-bold hover:bg-brand-purple/5 transition-colors w-full"
                         >
-                          {isGeneratingInvoice ? <Clock className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                          <span>تحميل الفاتورة يدوياً (PDF)</span>
+                          {isGeneratingInvoice ? <Clock className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                          <span>تحميل نسخة PDF يدوياً</span>
                         </button>
                       </div>
+
+                      <p className="text-[10px] text-gray-400 font-bold leading-relaxed pt-2">
+                        * بعد اتمام التحويل يرجى ارسال الفاتورة وايصال التحويل عبر الواتساب لتأكيد طلبك.
+                      </p>
                     </div>
                   )}
                   <button 
